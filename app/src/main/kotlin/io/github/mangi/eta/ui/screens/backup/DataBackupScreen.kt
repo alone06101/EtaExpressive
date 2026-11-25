@@ -548,7 +548,7 @@ private fun BackupNoticeRow(
  * 走官方分段行 [EtaSegmentedRow]（自带涟漪与语义），加载态经 [EtaLoadingSlot] 统一封装。
  */
 @Composable
-private fun BackupActionRow(
+internal fun BackupActionRow(
     title: String,
     summary: String,
     icon: ImageVector,

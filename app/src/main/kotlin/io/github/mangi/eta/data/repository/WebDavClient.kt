@@ -117,7 +117,7 @@ internal class WebDavClient(
 """.trimIndent().toRequestBody(XML_MEDIA_TYPE)
 
     companion object {
-        private const val XML_MEDIA_TYPE = "application/xml; charset=utf-8"
+        private val XML_MEDIA_TYPE = "application/xml; charset=utf-8".toMediaType()
         private val ZIP_MEDIA_TYPE = "application/zip".toMediaType()
         private val EMPTY_BODY: RequestBody = ByteArray(0).toRequestBody(null)
 
