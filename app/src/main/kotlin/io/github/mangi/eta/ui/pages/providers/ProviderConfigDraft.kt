@@ -27,6 +27,14 @@ internal data class ProviderConfigDraft(
     val name: String,
     val baseUrl: String,
     val apiKey: String,
+    /**
+     * 该服务商的系统提示词；空串表示不设置。
+     *
+     * 上游曾以「运行时已使用助手提示词，提供商页的系统提示词只是残留设置」为由整块删除本字段，
+     * 但 ProviderSetting.systemPrompt 与数据库 system_prompt 列一直都在，结果是
+     * 「有值却看不见、改不了也清不掉」。本 Fork 恢复该入口，并让助手侧可以选择跟随它。
+     */
+    val systemPrompt: String = "",
     val authMode: String = ProviderAuthModes.DEFAULT,
     val isEnabled: Boolean,
     val endpointMode: String,
@@ -49,6 +57,7 @@ internal data class ProviderConfigDraft(
             name = provider.name,
             baseUrl = provider.baseUrl,
             apiKey = provider.apiKey,
+            systemPrompt = provider.systemPrompt.orEmpty(),
             authMode = ProviderAuthModes.parse(provider.authMode),
             isEnabled = provider.isEnabled,
             endpointMode = when (provider) {
@@ -78,6 +87,7 @@ internal val ProviderConfigDraftSaver = mapSaver(
             "name" to draft.name,
             "baseUrl" to draft.baseUrl,
             "apiKey" to draft.apiKey,
+            "systemPrompt" to draft.systemPrompt,
             "authMode" to draft.authMode,
             "isEnabled" to draft.isEnabled,
             "endpointMode" to draft.endpointMode,
@@ -110,6 +120,7 @@ internal val ProviderConfigDraftSaver = mapSaver(
             name = state.getValue("name") as String,
             baseUrl = state.getValue("baseUrl") as String,
             apiKey = state.getValue("apiKey") as String,
+            systemPrompt = state["systemPrompt"] as? String ?: "",
             authMode = ProviderAuthModes.parse(state["authMode"] as? String),
             isEnabled = state.getValue("isEnabled") as Boolean,
             endpointMode = state.getValue("endpointMode") as String,
@@ -138,6 +149,7 @@ internal fun buildUpdatedProvider(
     name: String,
     baseUrl: String,
     apiKey: String,
+    systemPrompt: String? = null,
     authMode: String = ProviderAuthModes.DEFAULT,
     isEnabled: Boolean,
     endpointMode: String,
@@ -150,6 +162,8 @@ internal fun buildUpdatedProvider(
     sessionGatewayJson: String = "",
 ): ProviderSetting {
     val profile = ProviderConnectionProfile.forAuthMode(authMode)
+    // 空串落库成 null：与「从未设置」等价，助手侧跟随开关据此判断是否回落默认提示词。
+    val prompt = systemPrompt?.trim()?.takeIf { it.isNotBlank() }
     return when (source) {
         is OpenAiCompatibleProviderSetting -> source.copy(
             customHeaders = customHeaders.map { it.copy(name = it.name.trim()) },
@@ -158,6 +172,7 @@ internal fun buildUpdatedProvider(
             name = name.trim(),
             baseUrl = profile?.baseUrl ?: baseUrl.trim(),
             apiKey = apiKey.trim(),
+            systemPrompt = prompt,
             authMode = ProviderAuthModes.parse(authMode),
             isEnabled = isEnabled,
             endpointMode = profile?.endpointMode ?: endpointMode,
@@ -172,6 +187,7 @@ internal fun buildUpdatedProvider(
             name = name.trim(),
             baseUrl = profile?.baseUrl ?: baseUrl.trim(),
             apiKey = apiKey.trim(),
+            systemPrompt = prompt,
             authMode = ProviderAuthModes.parse(authMode),
             isEnabled = isEnabled,
             endpointMode = profile?.endpointMode ?: endpointMode,
@@ -186,6 +202,7 @@ internal fun buildUpdatedProvider(
             name = name.trim(),
             baseUrl = baseUrl.trim(),
             apiKey = apiKey.trim(),
+            systemPrompt = prompt,
             authMode = ProviderAuthModes.parse(authMode),
             isEnabled = isEnabled,
             anthropicVersion = anthropicVersion.trim().ifBlank { AnthropicProviderSetting.DEFAULT_ANTHROPIC_VERSION },
@@ -209,6 +226,7 @@ internal fun ProviderConfigDraft.toProvider(source: ProviderSetting): ProviderSe
     name = name,
     baseUrl = baseUrl,
     apiKey = apiKey,
+    systemPrompt = systemPrompt,
     authMode = authMode,
     isEnabled = isEnabled,
     endpointMode = endpointMode,

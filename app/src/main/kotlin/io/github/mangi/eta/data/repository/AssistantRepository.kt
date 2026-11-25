@@ -111,9 +111,21 @@ internal object AssistantRepository {
         require(profiles.map { io.github.mangi.eta.data.model.AssistantStorage.id(it.id) }.toSet().size == profiles.size) { "助手 ID 重复" }
     }
 
-    fun systemPrompt(): String {
+    /**
+     * 当前助手的系统提示词快照。
+     *
+     * providerPrompt 由调用方注入：这个方法是同步的、可能被主线程调用，不能在这里读服务商表
+     * （每个 provider 一次 Keystore 解密 binder 往返）。同步上下文拿不到时传 null，
+     * 结果等同于「跟随但服务商留空」——回落到人格，行为与改动前一致。
+     */
+    fun systemPrompt(providerPrompt: String? = null): String {
         val assistant = if (::applicationContext.isInitialized) active() else defaultProfile()
-        return AssistantPrompt.build(assistant.name, assistant.prompt)
+        return AssistantPrompt.runtimeBase(
+            name = assistant.name,
+            prompt = assistant.prompt,
+            providerPrompt = providerPrompt,
+            followProvider = assistant.followProviderSystemPrompt,
+        )
     }
 
     fun avatarFile(fileName: String?): File? {

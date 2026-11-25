@@ -93,6 +93,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import io.github.mangi.eta.data.repository.RuntimeConfigRepository
+import io.github.mangi.eta.data.repository.ProviderRepository
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.concurrent.thread
@@ -2689,7 +2690,12 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
             assistantId = plain.id,
             config = config.copy(
                 assistantId = plain.id,
-                systemPrompt = AssistantPrompt.build(plain.name, plain.prompt),
+                systemPrompt = AssistantPrompt.runtimeBase(
+                    name = plain.name,
+                    prompt = plain.prompt,
+                    providerPrompt = ProviderRepository.providerById(config.providerId)?.systemPrompt,
+                    followProvider = plain.followProviderSystemPrompt,
+                ),
             ),
         )
     }

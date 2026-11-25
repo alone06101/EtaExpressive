@@ -27,6 +27,15 @@ data class AssistantProfile(
      * 因此老档案不需要迁移，用户没动过的组行为不变。
      */
     val toolGroupSwitches: Map<String, Boolean> = emptyMap(),
+    /**
+     * 系统提示词是否跟随「AI 服务提供商」页面里的服务商提示词。
+     *
+     * 默认开启：上游删掉服务商提示词入口后，运行时只认人格；这里把服务商提示词重新接回
+     * 提示词基座，同时保留助手人格。服务商没写提示词时自动回落到人格，因此老用户行为不变。
+     *
+     * 缺失字段按 Kotlin 默认值 true 反序列化，老档案不需要迁移。
+     */
+    val followProviderSystemPrompt: Boolean = true,
 ) {
     /** 该组对这个助手是否启用；未设置时回落到 [fallback]（通常为全局开关）。 */
     fun toolGroupEnabled(groupId: String, fallback: Boolean): Boolean =
@@ -83,6 +92,28 @@ internal object AssistantPrompt {
         val body = prompt.trim()
         if (body.isEmpty()) return identity(name)
         return identity(name) + "\n\n人格设定：\n" + body
+    }
+
+    /**
+     * 运行时提示词基座的唯一出口：服务商提示词与助手人格在这里合流。
+     *
+     * - [followProvider] 打开且服务商写了提示词：拿服务商提示词当基座，人格作为
+     *   「人格设定」追加在末尾——人格仍生效，只是不再独占身份句。
+     * - 其余情况：沿用 [build] 的结果（人格或默认身份）。
+     *
+     * AgentPromptBuilder 会把数据前置块拼在该基座之前，所以身份句在后面不影响指令顺序。
+     */
+    fun runtimeBase(
+        name: String,
+        prompt: String,
+        providerPrompt: String?,
+        followProvider: Boolean = true,
+    ): String {
+        val provider = providerPrompt?.trim().orEmpty()
+        val body = prompt.trim()
+        if (!followProvider || provider.isEmpty()) return build(name, body)
+        if (body.isEmpty()) return provider
+        return provider + "\n\n人格设定：\n" + body
     }
 }
 

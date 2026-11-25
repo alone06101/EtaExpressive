@@ -2266,6 +2266,11 @@
   <string name="assistant_skills_summary">只對目前助手生效。三個內建 Skills 預設開啟，新安裝的需要在這裡手動打開</string>
   <string name="settings_assistants">助手</string>
 
+  <string name="assistant_follow_provider_title">跟隨服務商系統提示詞</string>
+  <string name="assistant_follow_provider_summary">開啟且目前服務商填寫了系統提示詞時，以它作為提示詞基座，下方的人格設定追加在後；關閉則只用人格。服務商留空時自動回落到人格。</string>
+  <string name="provider_system_prompt_title">系統提示詞</string>
+  <string name="provider_system_prompt_label">系統提示詞</string>
+  <string name="provider_system_prompt_summary">留空則不注入。助手的「跟隨服務商」開啟且此處有內容時，執行時優先使用它，助手人格與能力塊追加在其後。</string>
   <string name="provider_auth_method_title">認證方式</string>
   <string name="provider_auth_method_choose">選擇身分驗證方式</string>
   <string name="provider_auth_api_key">API Key</string>

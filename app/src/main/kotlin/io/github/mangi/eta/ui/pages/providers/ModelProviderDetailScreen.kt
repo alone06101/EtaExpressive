@@ -225,6 +225,7 @@ internal fun ModelProviderDetailScreen(
                         name = configDraft.name,
                         baseUrl = configDraft.baseUrl,
                         apiKey = configDraft.apiKey,
+                        systemPrompt = configDraft.systemPrompt,
                         authMode = configDraft.authMode,
                         isEnabled = configDraft.isEnabled,
                         endpointMode = configDraft.endpointMode,
@@ -618,6 +619,7 @@ private fun ProviderConfigTab(
                                             name = draft.name,
                                             baseUrl = draft.baseUrl,
                                             apiKey = draft.apiKey,
+                                            systemPrompt = draft.systemPrompt,
                                             authMode = draft.authMode,
                                             isEnabled = draft.isEnabled,
                                             endpointMode = draft.endpointMode,
@@ -688,6 +690,35 @@ private fun ProviderConfigTab(
             }
         }
 
+        // 服务商级系统提示词：上游曾以「运行时已用助手人格，这里只是残留设置」为由整块删除，
+        // 但字段一直在库里——恢复入口后，助手侧可把它设为「跟随」，由它决定全局提示词。
+        item(key = "system_prompt") {
+            EtaSegmentedColumn(
+                modifier = ProviderSectionGroupPadding,
+                title = stringResource(R.string.provider_system_prompt_title),
+            ) {
+                item(surface = false) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        ProviderField(
+                            value = draft.systemPrompt,
+                            onValueChange = { onDraftChange(draft.copy(systemPrompt = it)) },
+                            label = stringResource(R.string.provider_system_prompt_label),
+                            singleLine = false,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(140.dp),
+                        )
+                        M3Text(
+                            text = stringResource(R.string.provider_system_prompt_summary),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+                        )
+                    }
+                }
+            }
+        }
+
         item(key = "balance_option") {
             EtaSegmentedColumn(
                 modifier = ProviderSectionGroupPadding,
@@ -701,6 +732,7 @@ private fun ProviderConfigTab(
                         name = draft.name,
                         baseUrl = draft.baseUrl,
                         apiKey = draft.apiKey,
+                        systemPrompt = draft.systemPrompt,
                         authMode = draft.authMode,
                         isEnabled = draft.isEnabled,
                         endpointMode = draft.endpointMode,

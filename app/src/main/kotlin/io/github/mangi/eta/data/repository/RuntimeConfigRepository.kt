@@ -132,9 +132,19 @@ internal object RuntimeConfigRepository {
         assistant: io.github.mangi.eta.data.model.AssistantProfile? = null,
     ): AgentModelClient.ModelConfig {
         io.github.mangi.eta.data.model.RemovedProviderPolicy.requireSupported(provider)
-        val systemPrompt = assistant?.let {
-            io.github.mangi.eta.data.model.AssistantPrompt.build(it.name, it.prompt)
-        }?.ifBlank { BuiltinProviders.DEFAULT_SYSTEM_PROMPT }
+        // 提示词优先级：服务商提示词（仅当助手选择跟随）→ 助手人格 → 内置默认。
+        // runtimeBase 是唯一合流点：跟随且服务商写了内容时，服务商提示词当基座、人格追加在后。
+        val systemPrompt = (
+            assistant?.let {
+                io.github.mangi.eta.data.model.AssistantPrompt.runtimeBase(
+                    name = it.name,
+                    prompt = it.prompt,
+                    providerPrompt = provider.systemPrompt,
+                    followProvider = it.followProviderSystemPrompt,
+                )
+            }?.ifBlank { provider.systemPrompt?.trim() }
+                ?: provider.systemPrompt?.trim()
+            )?.ifBlank { BuiltinProviders.DEFAULT_SYSTEM_PROMPT }
             ?: BuiltinProviders.DEFAULT_SYSTEM_PROMPT
         val sourceType = ProviderSourceRegistry.resolve(provider)
         val profile = io.github.mangi.eta.data.provider.ProviderConnectionProfile.forAuthMode(provider.authMode)
@@ -207,6 +217,16 @@ internal object RuntimeConfigRepository {
                 .remove(Prefs.Keys.AGENT_RUNTIME_CONFIG_JSON)
                 .commit()
         }.getOrDefault(false)
+
+    /**
+     * 按 providerId 取服务商提示词（同步版本）。
+     *
+     * 派发线程与浮窗入口不在挂起上下文里，读一次缓存 provider 表即可；读失败按「无提示词」处理，
+     * 不能因为提示词读取拖垮整轮 run。
+     */
+    internal fun providerPrompt(providerId: String): String? =
+        runCatching { kotlinx.coroutines.runBlocking { ProviderRepository.providerById(providerId) } }
+            .getOrNull()?.systemPrompt?.takeIf { it.isNotBlank() }
 
     internal suspend fun configForProviderAndModel(
         providerId: String,

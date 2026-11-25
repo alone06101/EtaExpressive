@@ -17,6 +17,8 @@ class AssistantProfileDefaultsTest {
         )
         assertTrue(decoded.memoryEnabled)
         assertEquals(AssistantDefaults.ENABLED_SKILL_IDS, decoded.enabledSkillIds)
+        // 老档案没有该字段：默认跟随服务商提示词，配合「服务商留空回落人格」不改变老行为。
+        assertTrue(decoded.followProviderSystemPrompt)
     }
 
     @Test

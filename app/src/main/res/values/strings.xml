@@ -2288,6 +2288,11 @@
   <string name="assistant_skills_summary">Only affects this assistant. The three built-in skills start on; newly installed skills stay off until you enable them here</string>
   <string name="settings_assistants">Assistants</string>
 
+  <string name="assistant_follow_provider_title">Follow provider system prompt</string>
+  <string name="assistant_follow_provider_summary">When on and the current provider has a system prompt, it becomes the base prompt and this personality is appended after it. When off, the personality alone is used. Falls back to the personality if the provider is blank.</string>
+  <string name="provider_system_prompt_title">System prompt</string>
+  <string name="provider_system_prompt_label">System prompt</string>
+  <string name="provider_system_prompt_summary">Leave blank to skip. When the assistant follows the provider and this is filled, the runtime uses it as the base prompt and appends the personality and capability blocks after it.</string>
   <string name="provider_auth_method_title">Auth method</string>
   <string name="provider_auth_method_choose">Choose how to sign in</string>
   <string name="provider_auth_api_key">API Key</string>

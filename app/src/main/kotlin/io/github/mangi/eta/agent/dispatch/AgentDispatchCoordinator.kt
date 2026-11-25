@@ -844,7 +844,15 @@ internal class AgentDispatchCoordinator(
             ?: orchestratorConfig.copy(
                 // assistantId 不能清空：执行器按它取助手档案，空值会直接抛「助手不存在」使 run 速死。
                 assistantId = profile?.id ?: orchestratorConfig.assistantId,
-                systemPrompt = profile?.let { AssistantPrompt.build(it.name, it.prompt) }.orEmpty(),
+                systemPrompt = profile?.let {
+                    AssistantPrompt.runtimeBase(
+                        name = it.name,
+                        prompt = it.prompt,
+                        // 派发运行在后台线程：这里可以读服务商表（挂起封装内部 runBlocking）。
+                        providerPrompt = RuntimeConfigRepository.providerPrompt(target.providerId),
+                        followProvider = it.followProviderSystemPrompt,
+                    )
+                }.orEmpty(),
             )
         return AgentRuntimePolicy.constrain(
             config,

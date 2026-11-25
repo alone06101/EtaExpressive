@@ -83,6 +83,7 @@ internal fun AssistantEditScreen(
     // 按助手的工具开关：与记忆/技能同级，缺失的组回落到全局开关。
     var toolSwitches by remember(assistantId) { mutableStateOf(original.toolGroupSwitches) }
     var persistedToolSwitches by remember(assistantId) { mutableStateOf(original.toolGroupSwitches) }
+    var followProviderPrompt by remember(assistantId) { mutableStateOf(original.followProviderSystemPrompt) }
     var memoryDraft by remember(assistantId) { mutableStateOf("") }
     var memoryRevision by remember(assistantId) { mutableStateOf("") }
     var memorySaved by remember(assistantId) { mutableStateOf("") }
@@ -98,6 +99,7 @@ internal fun AssistantEditScreen(
         memoryEnabled != persistedMemoryEnabled ||
         enabledSkillIds != persistedSkillIds ||
         toolSwitches != persistedToolSwitches ||
+        followProviderPrompt != original.followProviderSystemPrompt ||
         memoryDraft != memorySaved
 
     LaunchedEffect(assistantId) {
@@ -165,7 +167,7 @@ internal fun AssistantEditScreen(
         val baseRevision = memoryRevision
         val targetProfile = original.copy(name = name, prompt = prompt, avatarFileName = avatarFileName,
             memoryEnabled = memoryEnabled, enabledSkillIds = enabledSkillIds.toList(),
-            toolGroupSwitches = toolSwitches)
+            toolGroupSwitches = toolSwitches, followProviderSystemPrompt = followProviderPrompt)
         val memoryChanged = targetMemory != memorySaved
         saving = true
         scope.launch {
@@ -267,6 +269,16 @@ internal fun AssistantEditScreen(
                 modifier = Modifier.padding(start = EtaGroupHorizontalPadding, end = EtaGroupHorizontalPadding, bottom = EtaSegmentedGroupSpacing),
                 title = stringResource(R.string.assistant_prompt_title),
             ) {
+                // 提示词基座在哪一侧决定「身份」写什么，所以放在人格输入框上方，而不是塞进工具开关里。
+                item {
+                    EtaSwitchRow(
+                        title = stringResource(R.string.assistant_follow_provider_title),
+                        summary = stringResource(R.string.assistant_follow_provider_summary),
+                        checked = followProviderPrompt,
+                        onCheckedChange = { followProviderPrompt = it },
+                        enabled = !saving,
+                    )
+                }
                 item(surface = false) {
                     AssistantField(
                         value = prompt,
