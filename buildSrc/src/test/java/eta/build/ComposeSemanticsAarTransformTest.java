@@ -75,7 +75,7 @@ public class ComposeSemanticsAarTransformTest {
         return bytes.toByteArray();
     }
     @Test public void upgradedComposeRequiresReview() {
-        ComposeSemanticsPlugin.requireUiVersion("androidx.compose.ui", "ui-android", "1.12.0-rc01");
+        ComposeSemanticsPlugin.requireUiVersion("androidx.compose.ui", "ui-android", "1.13.0-alpha01");
         assertThrows(org.gradle.api.GradleException.class,
             () -> ComposeSemanticsPlugin.requireUiVersion("androidx.compose.ui", "ui-android", "1.12.0"));
     }
