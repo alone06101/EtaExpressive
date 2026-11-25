@@ -69,7 +69,7 @@ jobs:
         run: |
           set -euo pipefail
           fixture="$RUNNER_TEMP/compose-ui-original.aar"
-          curl --fail --location --retry 3 'https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-android/1.12.0-rc01/ui-android-1.12.0-rc01.aar' -o "$fixture"
+          curl --fail --location --retry 3 'https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-android/1.13.0-alpha01/ui-android-1.13.0-alpha01.aar' -o "$fixture"
           ./gradlew --no-daemon --no-configuration-cache -p buildSrc test -Deta.compose.semantics.originalAar="$fixture"
 
       - name: 运行单元测试
