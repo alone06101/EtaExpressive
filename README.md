@@ -9,7 +9,7 @@
 
 ---
 
-<p><a href="https://github.com/Sam-Fic/EtaExpressive/releases"><img src="https://img.shields.io/github/downloads/Sam-Fic/EtaExpressive/total?logo=github&amp;label=%E4%B8%8B%E8%BD%BD%E9%87%8F&amp;color=1677FF" alt="GitHub Releases 累计下载量"></a> <img src="https://img.shields.io/badge/minSdk-34-3DDC84?logo=android&amp;logoColor=white" alt="minSdk 34"> <img src="https://img.shields.io/badge/Kotlin-2.4.20-7F52FF?logo=kotlin&amp;logoColor=white" alt="Kotlin 2.4.20"> <img src="https://img.shields.io/badge/AGP-9.4.0-3DDC84?logo=android&amp;logoColor=white" alt="AGP 9.4.0"> <img src="https://img.shields.io/badge/Assistant%20Integrations-ColorOS%20%26%20HyperOS-1677FF" alt="Assistant integrations for ColorOS and HyperOS"></p>
+<p><a href="https://github.com/alone06101/EtaExpressive/releases"><img src="https://img.shields.io/github/downloads/alone06101/EtaExpressive/total?logo=github&amp;label=%E4%B8%8B%E8%BD%BD%E9%87%8F&amp;color=1677FF" alt="GitHub Releases 累计下载量"></a> <img src="https://img.shields.io/badge/minSdk-34-3DDC84?logo=android&amp;logoColor=white" alt="minSdk 34"> <img src="https://img.shields.io/badge/Kotlin-2.4.20-7F52FF?logo=kotlin&amp;logoColor=white" alt="Kotlin 2.4.20"> <img src="https://img.shields.io/badge/AGP-9.4.0-3DDC84?logo=android&amp;logoColor=white" alt="AGP 9.4.0"> <img src="https://img.shields.io/badge/Assistant%20Integrations-ColorOS%20%26%20HyperOS-1677FF" alt="Assistant integrations for ColorOS and HyperOS"></p>
 
 **越过沙盒的 Android 系统级 AI 助手**
 
@@ -26,7 +26,7 @@ EtaExpressive 不仅是一个聊天框。将您自己的模型接入手机：它
 
 支持 **Android 14 及以上的 ARM64（arm64-v8a）设备**。APK 仅打包 ARM64 原生库，不提供 32 位 ARM 与 x86 构建。App 本体不限手机品牌，基础功能无需 Root。Root 和 LSPosed 可进一步解锁系统级访问与助手入口，具体取决于设备授权和 ROM 支持情况。
 
-[下载 APK](https://github.com/Sam-Fic/EtaExpressive/releases/latest) · [快速开始](#快速开始)
+[下载 APK](https://github.com/alone06101/EtaExpressive/releases/latest) · [快速开始](#快速开始)
 
 ## 本 Fork 的变化
 本项目在 [Eta 上游](https://github.com/Mangi-11/Eta) 的基础上，主要围绕 **Material Design 3 Expressive（M3E）** 的视觉风格重新设计了界面外观，并补充了一批功能改进。以下列出与上游相比的核心差异（完整改动见提交历史）：
@@ -41,7 +41,18 @@ EtaExpressive 不仅是一个聊天框。将您自己的模型接入手机：它
 - **CI 与测试稳定性**：修复了多组单元测试中的时序敏感断言与 Lint 错误，确保 `verify` 作业在 GitHub Actions 中稳定通过。
 - **Release 工作流**：跟进实际发版流程，补充了中英双语更新日志的自动生成与 Release Assets 上传功能。
 
-如需完整的新增功能列表，请参阅本仓库的 [Releases](https://github.com/Sam-Fic/EtaExpressive/releases) 与 [提交历史](https://github.com/Sam-Fic/EtaExpressive/commits/main)。
+如需完整的新增功能列表，请参阅本仓库的 [Releases](https://github.com/alone06101/EtaExpressive/releases) 与 [提交历史](https://github.com/alone06101/EtaExpressive/commits/main)。
+
+### 相对 Sam-Fic/EtaExpressive 的改动
+
+本仓库是 [alone06101/EtaExpressive](https://github.com/alone06101/EtaExpressive) 本身，向上溯源为 [Sam-Fic/EtaExpressive](https://github.com/Sam-Fic/EtaExpressive) → [Mangi-11/Eta](https://github.com/Mangi-11/Eta)。在继承 M3E 界面与既有改进的基础上，本仓库额外包含以下改动：
+
+- **服务商系统提示词恢复**：上游提交 `c0dc9aac` 以「运行时已使用助手提示词，提供商页的系统提示词只是残留设置」为由，整块删除了「AI 服务提供商」页的系统提示词输入，但 `ProviderSetting.systemPrompt` 与数据库 `system_prompt` 列始终保留，结果是「有值却看不见、改不了也清不掉」。本仓库恢复该入口与完整保存链路（草稿、状态保存、三语言文案），空串落库为 `null`，与「从未设置」等价。
+- **助手侧「跟随服务商」开关**：助手人格页新增开关（默认开启）。开启且当前服务商填写了系统提示词时，以它作为提示词基座，人格设定追加在后；关闭或服务商留空时完全沿用原行为。
+- **提示词优先级统一**：新增唯一合流点 `AssistantPrompt.runtimeBase`，优先级为「服务商提示词（跟随时）→ 助手人格 → 内置默认」，并接入 `buildRuntimeConfig`、外部入口归一化、派发工作会话回落与 `AssistantRepository.systemPrompt` 四处。老档案缺字段按默认值解码，无需数据库迁移。
+- **构建链路修复**：修正 `build-debug` 工作流下载的 Compose AAR 版本（与 `ComposeSemanticsAarTransform.VERSION`、`libs.versions.toml` 对齐到 `1.13.0-alpha01`）、`buildSrc` 版本断言、以及 traversal 补丁测试的过期期望；签名校验改为校验本仓库自己的证书指纹。
+
+> 提示词行为：服务商提示词留空时，行为与上游完全一致。
 
 ## 界面预览
 | GUI Agent | 作为系统语音助手使用 |
@@ -116,7 +127,7 @@ Provider 层支持 OpenAI-compatible Chat Completions、Responses API 和 Anthro
 - **运行边界**：任务可随时停止或接管。后台运行受 Android 与厂商进程管理影响，强停或重启后需手动启动；系统与应用更新也可能需要重新适配 Hook。
 
 ## 快速开始
-1. 从 [Releases](https://github.com/Sam-Fic/EtaExpressive/releases/latest) 下载 APK，安装后在“模型提供商”中填写 API Key 并选择模型。执行任务需要 Tool Calling，理解图片还需模型支持图片输入。
+1. 从 [Releases](https://github.com/alone06101/EtaExpressive/releases/latest) 下载 APK，安装后在“模型提供商”中填写 API Key 并选择模型。执行任务需要 Tool Calling，理解图片还需模型支持图片输入。
 2. 按任务需要配置工具开关与权限：GUI Agent 需要无障碍服务；通知、应用使用情况需分别授权；位置工具需要“始终允许”。工具页可查看当前设备的可用能力。
 3. 开始对话。需要 Linux 时，在“Linux 工具环境”中安装发行版、基础工具及所需开发工具；需要系统入口时，参见 [系统助手入口](#系统助手入口)。
    - **普通设备**：Android 14+ 的 ARM64 机型，可使用聊天、浏览器、记忆、Skills、MCP、普通终端与私有工作区；GUI 和本机信息读取按需授权。Linux 支持对应的 64 位设备。
@@ -159,8 +170,8 @@ Provider 层支持 OpenAI-compatible Chat Completions、Responses API 和 Anthro
 - 此外，感谢所有在手机上本地部署运行的开源模型——包括语音合成与识别模型、Embedding 模型等——它们让 EtaExpressive 能够在不依赖云端的情况下完成语音交互、语义检索与本地推理。
 
 ## 社区
-- 反馈问题：[GitHub Issues](https://github.com/Sam-Fic/EtaExpressive/issues)
-- 源码与发版：[Sam-Fic/EtaExpressive](https://github.com/Sam-Fic/EtaExpressive)
+- 反馈问题：[GitHub Issues](https://github.com/alone06101/EtaExpressive/issues)
+- 源码与发版：[alone06101/EtaExpressive](https://github.com/alone06101/EtaExpressive)
 
 ## 许可证
 本项目与上游 Eta 一样采用 [GPL-3.0](LICENSE) 开源，详情请参阅 [LICENSE](LICENSE)。

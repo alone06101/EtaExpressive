@@ -9,7 +9,7 @@
 
 ---
 
-<p><a href="https://github.com/Sam-Fic/EtaExpressive/releases"><img src="https://img.shields.io/github/downloads/Sam-Fic/EtaExpressive/total?logo=github&amp;label=Downloads&amp;color=1677FF" alt="Total GitHub Releases downloads"></a> <img src="https://img.shields.io/badge/minSdk-34-3DDC84?logo=android&amp;logoColor=white" alt="minSdk 34"> <img src="https://img.shields.io/badge/Kotlin-2.4.20-7F52FF?logo=kotlin&amp;logoColor=white" alt="Kotlin 2.4.20"> <img src="https://img.shields.io/badge/AGP-9.4.0-3DDC84?logo=android&amp;logoColor=white" alt="AGP 9.4.0"> <img src="https://img.shields.io/badge/Assistant%20Integrations-ColorOS%20%26%20HyperOS-1677FF" alt="Assistant integrations for ColorOS and HyperOS"></p>
+<p><a href="https://github.com/alone06101/EtaExpressive/releases"><img src="https://img.shields.io/github/downloads/alone06101/EtaExpressive/total?logo=github&amp;label=Downloads&amp;color=1677FF" alt="Total GitHub Releases downloads"></a> <img src="https://img.shields.io/badge/minSdk-34-3DDC84?logo=android&amp;logoColor=white" alt="minSdk 34"> <img src="https://img.shields.io/badge/Kotlin-2.4.20-7F52FF?logo=kotlin&amp;logoColor=white" alt="Kotlin 2.4.20"> <img src="https://img.shields.io/badge/AGP-9.4.0-3DDC84?logo=android&amp;logoColor=white" alt="AGP 9.4.0"> <img src="https://img.shields.io/badge/Assistant%20Integrations-ColorOS%20%26%20HyperOS-1677FF" alt="Assistant integrations for ColorOS and HyperOS"></p>
 
 **A System-Level Android AI Assistant That Steps Beyond the Sandbox**
 
@@ -26,7 +26,7 @@ It is based on [Eta](https://github.com/Mangi-11/Eta). The upstream project has 
 
 Requires **Android 14 or later on ARM64 (arm64-v8a) devices**. The APK only packages ARM64 native libraries and does not provide 32-bit ARM or x86 builds. The app itself is not brand-locked, and core features do not require Root. Root and LSPosed can further unlock system access and assistant entry points, depending on authorization and ROM support.
 
-[Download APK](https://github.com/Sam-Fic/EtaExpressive/releases/latest) · [Getting Started](#getting-started)
+[Download APK](https://github.com/alone06101/EtaExpressive/releases/latest) · [Getting Started](#getting-started)
 
 ## Changes in This Fork
 Built on top of the [Eta upstream](https://github.com/Mangi-11/Eta), this fork primarily redesigns the interface appearance around the **Material Design 3 Expressive (M3E)** visual style and adds a batch of functional improvements. The following lists the core differences compared to the upstream (see commit history for full details):
@@ -41,7 +41,18 @@ Built on top of the [Eta upstream](https://github.com/Mangi-11/Eta), this fork p
 - **CI and Test Stability**: Fixed timing-sensitive assertions and lint errors in multiple unit tests, ensuring the `verify` job passes stably in GitHub Actions.
 - **Release Workflow**: Aligned with the actual release process, adding automatic generation of bilingual (Chinese/English) changelogs and Release Assets uploads.
 
-For a complete list of new features, please refer to this repository's [Releases](https://github.com/Sam-Fic/EtaExpressive/releases) and [commit history](https://github.com/Sam-Fic/EtaExpressive/commits/main).
+For a complete list of new features, please refer to this repository's [Releases](https://github.com/alone06101/EtaExpressive/releases) and [commit history](https://github.com/alone06101/EtaExpressive/commits/main).
+
+### Changes Relative to Sam-Fic/EtaExpressive
+
+This repository traces back through [Sam-Fic/EtaExpressive](https://github.com/Sam-Fic/EtaExpressive) to [Mangi-11/Eta](https://github.com/Mangi-11/Eta). On top of the inherited M3E interface and existing improvements, this fork adds:
+
+- **Restored provider system prompt**: Upstream commit `c0dc9aac` deleted the system-prompt field on the "AI provider" page, on the grounds that the runtime already uses the assistant prompt and the provider field was vestigial. However `ProviderSetting.systemPrompt` and the database `system_prompt` column were never removed, leaving values that could not be seen, edited, or cleared. This fork restores the entry and its full save path (draft state, saved state, three locales). A blank value persists as `null`, equivalent to "never set".
+- **Assistant-side "follow provider" switch**: A new switch on the personality screen (on by default). When enabled and the current provider has a prompt, that prompt becomes the base and the personality is appended after it. When disabled or the provider field is blank, behavior is unchanged.
+- **Unified prompt precedence**: A single merge point, `AssistantPrompt.runtimeBase`, with precedence "provider prompt (when following) -> assistant personality -> built-in default", wired into `buildRuntimeConfig`, external-entry normalization, dispatched work-session fallback, and `AssistantRepository.systemPrompt`. Older profiles decode the missing field to its default, so no database migration is needed.
+- **Build chain fixes**: Corrected the Compose AAR version downloaded by the `build-debug` workflow (aligned to `1.13.0-alpha01` with `ComposeSemanticsAarTransform.VERSION` and `libs.versions.toml`), stale version assertions in `buildSrc`, and an outdated expectation in the traversal patch test; the signature check now verifies this repository's own certificate.
+
+> Prompt behavior is identical to upstream whenever the provider system prompt is left blank.
 
 ## Interface Preview
 | GUI Agent | Using as a System Voice Assistant |
@@ -116,7 +127,7 @@ System tools, sensitive reads, sensitive operations, terminal and files, web bro
 - **Execution Boundaries**: Tasks can be stopped or taken over. Background execution is subject to Android and OEM process management; manual startup is required after a force stop or reboot; system and app updates may also require Hook re-adaptation.
 
 ## Getting Started
-1. Download the APK from [Releases](https://github.com/Sam-Fic/EtaExpressive/releases/latest). After installation, fill in your API Key and select a model in "Model Provider". Task execution requires Tool Calling, and understanding images requires the model to support image input.
+1. Download the APK from [Releases](https://github.com/alone06101/EtaExpressive/releases/latest). After installation, fill in your API Key and select a model in "Model Provider". Task execution requires Tool Calling, and understanding images requires the model to support image input.
 2. Configure tool switches and permissions as needed: GUI Agent requires accessibility services; notifications and app usage require separate authorization; location tools require "Allow all the time". The tools page shows the available capabilities of the current device.
 3. Start a conversation. When Linux is needed, install the distribution, base tools, and required development tools in "Linux Tool Environment"; for system entry points, refer to [System Assistant Entry Points](#system-assistant-entry-points).
 - **Ordinary Devices**: Android 14+ ARM64 devices can use chat, browser, memory, Skills, MCP, ordinary terminal, and private workspaces; GUI and on-device information retrieval require on-demand authorization. Linux supports corresponding 64-bit devices.
@@ -159,8 +170,8 @@ Dedicated retrieval for contacts, SMS, and calendars currently still requires Ro
 - Additionally, thanks to all open-source models deployed and run locally on phones—including speech synthesis and recognition models, Embedding models, etc.—they enable EtaExpressive to complete voice interaction, semantic retrieval, and local inference without relying on the cloud.
 
 ## Community
-- Feedback: [GitHub Issues](https://github.com/Sam-Fic/EtaExpressive/issues)
-- Source Code and Releases: [Sam-Fic/EtaExpressive](https://github.com/Sam-Fic/EtaExpressive)
+- Feedback: [GitHub Issues](https://github.com/alone06101/EtaExpressive/issues)
+- Source Code and Releases: [alone06101/EtaExpressive](https://github.com/alone06101/EtaExpressive)
 
 ## License
 This project, like the upstream Eta, is open-sourced under [GPL-3.0](LICENSE). See [LICENSE](LICENSE) for details.
