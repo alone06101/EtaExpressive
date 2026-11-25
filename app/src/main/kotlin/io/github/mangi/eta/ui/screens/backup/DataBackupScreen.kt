@@ -356,6 +356,10 @@ internal fun DataBackupScreen(
                 }
             }
         }
+        // WebDAV 云端备份：本地导出/导入之后，同一套备份包的云端通道。
+        item(key = "webdav") {
+            WebDavBackupSection()
+        }
         item(key = "transfer") {
             EtaSegmentedColumn(
                 modifier = Modifier.padding(start = EtaGroupHorizontalPadding, end = EtaGroupHorizontalPadding, bottom = EtaSegmentedGroupSpacing),

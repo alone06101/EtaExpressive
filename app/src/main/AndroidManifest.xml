@@ -446,6 +446,15 @@
             android:name=".agent.pickup.PickupCodeCompleteReceiver"
             android:exported="false" />
 
+        <!-- WebDAV 自动备份：定时闹钟到点上传一轮；开机后补排周期闹钟。 -->
+        <receiver
+            android:name=".data.repository.WebDavAutoBackupReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
         <!-- 媒体语义索引自动更新：定时闹钟到点跑一轮；开机后补排周期闹钟。 -->
         <receiver
             android:name=".agent.media.index.MediaIndexAutoUpdateReceiver"

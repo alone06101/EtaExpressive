@@ -83,6 +83,9 @@ internal object SettingsDataStore {
      * 远程 agent 服务器配置列表（JSON）。authToken 随配置明文存储：它只是局域网内防陌生连接的
      * 共享口令，不是账号凭据，且远程链路本身无加密——设置页会明示这一风险。
      */
+    /** WebDAV 云端备份配置（JSON，密码字段存密文）。 */
+    private val WEBDAV_SETTINGS = stringPreferencesKey("webdav_settings_v1")
+    private val webDavJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     private val REMOTE_SERVERS = stringPreferencesKey("remote_servers_v1")
     private val remoteServersJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     private const val SELECTED_MODEL_BY_PROVIDER_PREFIX = "selected_model_id_by_provider."
@@ -132,6 +135,26 @@ internal object SettingsDataStore {
                 } ?: WebToolsSettings()
             }
             .distinctUntilChanged()
+    }
+
+    fun webDavSettingsFlow(): Flow<io.github.mangi.eta.data.model.WebDavSettings> {
+        ensureInitialized()
+        return dataStore.data
+            .map { prefs ->
+                prefs[WEBDAV_SETTINGS]?.let { raw ->
+                    runCatching {
+                        webDavJson.decodeFromString<io.github.mangi.eta.data.model.WebDavSettings>(raw)
+                    }.getOrNull()
+                } ?: io.github.mangi.eta.data.model.WebDavSettings()
+            }
+            .distinctUntilChanged()
+    }
+
+    suspend fun webDavSettings(): io.github.mangi.eta.data.model.WebDavSettings = webDavSettingsFlow().first()
+
+    suspend fun setWebDavSettings(settings: io.github.mangi.eta.data.model.WebDavSettings) {
+        ensureInitialized()
+        dataStore.edit { prefs -> prefs[WEBDAV_SETTINGS] = webDavJson.encodeToString(settings) }
     }
 
     suspend fun webToolsSettings(): WebToolsSettings = webToolsSettingsFlow().first()
