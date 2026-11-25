@@ -58,12 +58,20 @@ public class ComposeSemanticsAarTransformTest {
         byte[] source = official();
         Map<String, byte[]> original = unzip(ComposeSemanticsAarTransform.originalClasses(source));
         Map<String, byte[]> patched = unzip(unzip(ComposeSemanticsAarTransform.patchExact(source)).get("classes.jar"));
-        for (String target : List.of(ComposeTransparencyPatch.COORD, ComposeTransparencyPatch.NODE, ComposeTransparencyPatch.OWNER, ComposeTraversalFocusPatch.TARGET)) {
+        // 只列真正改字节码的目标：ComposeTraversalFocusPatch 自 1.13.0-alpha01 起
+        // 已改为「只校验、不改写」（上游自带 containsKey 守卫），patched 里该类的字节
+        // 与原始 AAR 完全一致，换回原始版本自然校验通过，断言它必须抛错是错的。
+        for (String target : List.of(ComposeTransparencyPatch.COORD, ComposeTransparencyPatch.NODE, ComposeTransparencyPatch.OWNER)) {
             Map<String, byte[]> broken = new LinkedHashMap<>(patched);
             broken.put(target + ".class", original.get(target + ".class"));
             assertThrows(org.gradle.api.GradleException.class,
                     () -> ComposeSemanticsAarTransform.assertConsumerClasses(zip(broken)));
         }
+        // traversal 目标不再改写字节码，但仍必须校验通过：守卫在，说明无需补丁；
+        // 守卫消失（上游回退优化）时 verify 会抛「upstream traversal guard missing」。
+        Map<String, byte[]> traversal = new LinkedHashMap<>(patched);
+        traversal.put(ComposeTraversalFocusPatch.TARGET + ".class", original.get(ComposeTraversalFocusPatch.TARGET + ".class"));
+        ComposeSemanticsAarTransform.assertConsumerClasses(zip(traversal));
     }
     private static byte[] zip(Map<String, byte[]> entries) throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
