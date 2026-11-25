@@ -11,23 +11,6 @@
 
 <p><a href="https://github.com/alone06101/EtaExpressive/releases"><img src="https://img.shields.io/github/downloads/alone06101/EtaExpressive/total?logo=github&amp;label=%E4%B8%8B%E8%BD%BD%E9%87%8F&amp;color=1677FF" alt="GitHub Releases 累计下载量"></a> <img src="https://img.shields.io/badge/minSdk-34-3DDC84?logo=android&amp;logoColor=white" alt="minSdk 34"> <img src="https://img.shields.io/badge/Kotlin-2.4.20-7F52FF?logo=kotlin&amp;logoColor=white" alt="Kotlin 2.4.20"> <img src="https://img.shields.io/badge/AGP-9.4.0-3DDC84?logo=android&amp;logoColor=white" alt="AGP 9.4.0"> <img src="https://img.shields.io/badge/Assistant%20Integrations-ColorOS%20%26%20HyperOS-1677FF" alt="Assistant integrations for ColorOS and HyperOS"></p>
 
-**越过沙盒的 Android 系统级 AI 助手**
-
-EtaExpressive 不仅是一个聊天框。将您自己的模型接入手机：它可以调用系统 API、查看屏幕、运行终端、读写文件，也能检索通知、日程、相册等本机信息。在同一轮对话中，提问与任务执行可无缝衔接。
-
-本项目基于 [Eta](https://github.com/Mangi-11/Eta)。上游项目已构建了 Agent Runtime、系统入口和工具层；本 Fork 致力于进一步优化日常使用体验，包括压缩策略、备份与还原、打开方式、视觉模型、浏览器以及 Linux 环境。模型与服务商由您自行选择，**需要自备 API Key（BYOK）**。
-
-**它能实际访问的系统范围**：
-- **系统**：闹钟、音量、媒体播放与设备状态，直接通过 Android API 调用，无需逐步操作界面。
-- **屏幕**：基于无障碍服务的 GUI Agent，支持点击、滚动和文本输入；您可随时停止或接管控制权。
-- **终端**：支持 Android Shell 以及 Alpine / Debian Linux，可运行文件、脚本及守护进程任务。
-- **本机数据**：通知、相册、日历、短信等；部分数据源需要 Root 权限，以及对应 ROM 与应用的支持。
-- **系统入口**：在配备 LSPosed 的环境下，可接管电源键、小布助手和超级小爱，将原生助手入口的任务路由至 EtaExpressive。
-
-支持 **Android 14 及以上的 ARM64（arm64-v8a）设备**。APK 仅打包 ARM64 原生库，不提供 32 位 ARM 与 x86 构建。App 本体不限手机品牌，基础功能无需 Root。Root 和 LSPosed 可进一步解锁系统级访问与助手入口，具体取决于设备授权和 ROM 支持情况。
-
-[下载 APK](https://github.com/alone06101/EtaExpressive/releases/latest) · [快速开始](#快速开始)
-
 ## 本 Fork 的变化
 本项目在 [Eta 上游](https://github.com/Mangi-11/Eta) 的基础上，主要围绕 **Material Design 3 Expressive（M3E）** 的视觉风格重新设计了界面外观，并补充了一批功能改进。以下列出与上游相比的核心差异（完整改动见提交历史）：
 
@@ -53,6 +36,25 @@ EtaExpressive 不仅是一个聊天框。将您自己的模型接入手机：它
 - **构建链路修复**：修正 `build-debug` 工作流下载的 Compose AAR 版本（与 `ComposeSemanticsAarTransform.VERSION`、`libs.versions.toml` 对齐到 `1.13.0-alpha01`）、`buildSrc` 版本断言、以及 traversal 补丁测试的过期期望；签名校验改为校验本仓库自己的证书指纹。
 
 > 提示词行为：服务商提示词留空时，行为与上游完全一致。
+
+## 关于本项目
+
+**越过沙盒的 Android 系统级 AI 助手**
+
+EtaExpressive 不仅是一个聊天框。将您自己的模型接入手机：它可以调用系统 API、查看屏幕、运行终端、读写文件，也能检索通知、日程、相册等本机信息。在同一轮对话中，提问与任务执行可无缝衔接。
+
+本项目基于 [Eta](https://github.com/Mangi-11/Eta)。上游项目已构建了 Agent Runtime、系统入口和工具层；本 Fork 致力于进一步优化日常使用体验，包括压缩策略、备份与还原、打开方式、视觉模型、浏览器以及 Linux 环境。模型与服务商由您自行选择，**需要自备 API Key（BYOK）**。
+
+**它能实际访问的系统范围**：
+- **系统**：闹钟、音量、媒体播放与设备状态，直接通过 Android API 调用，无需逐步操作界面。
+- **屏幕**：基于无障碍服务的 GUI Agent，支持点击、滚动和文本输入；您可随时停止或接管控制权。
+- **终端**：支持 Android Shell 以及 Alpine / Debian Linux，可运行文件、脚本及守护进程任务。
+- **本机数据**：通知、相册、日历、短信等；部分数据源需要 Root 权限，以及对应 ROM 与应用的支持。
+- **系统入口**：在配备 LSPosed 的环境下，可接管电源键、小布助手和超级小爱，将原生助手入口的任务路由至 EtaExpressive。
+
+支持 **Android 14 及以上的 ARM64（arm64-v8a）设备**。APK 仅打包 ARM64 原生库，不提供 32 位 ARM 与 x86 构建。App 本体不限手机品牌，基础功能无需 Root。Root 和 LSPosed 可进一步解锁系统级访问与助手入口，具体取决于设备授权和 ROM 支持情况。
+
+[下载 APK](https://github.com/alone06101/EtaExpressive/releases/latest) · [快速开始](#快速开始)
 
 ## 界面预览
 | GUI Agent | 作为系统语音助手使用 |

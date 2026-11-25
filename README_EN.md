@@ -11,23 +11,6 @@
 
 <p><a href="https://github.com/alone06101/EtaExpressive/releases"><img src="https://img.shields.io/github/downloads/alone06101/EtaExpressive/total?logo=github&amp;label=Downloads&amp;color=1677FF" alt="Total GitHub Releases downloads"></a> <img src="https://img.shields.io/badge/minSdk-34-3DDC84?logo=android&amp;logoColor=white" alt="minSdk 34"> <img src="https://img.shields.io/badge/Kotlin-2.4.20-7F52FF?logo=kotlin&amp;logoColor=white" alt="Kotlin 2.4.20"> <img src="https://img.shields.io/badge/AGP-9.4.0-3DDC84?logo=android&amp;logoColor=white" alt="AGP 9.4.0"> <img src="https://img.shields.io/badge/Assistant%20Integrations-ColorOS%20%26%20HyperOS-1677FF" alt="Assistant integrations for ColorOS and HyperOS"></p>
 
-**A System-Level Android AI Assistant That Steps Beyond the Sandbox**
-
-EtaExpressive is more than just a chat box. Connect your own model to your phone: it can call system APIs, see the screen, run a terminal, read and write files, and retrieve on-device information such as notifications, calendars, and photos. Asking questions and getting things done can happen seamlessly within the same conversation.
-
-It is based on [Eta](https://github.com/Mangi-11/Eta). The upstream project has built the Agent Runtime, system entry points, and tool layer; this project continues to improve daily usability: compression strategies, backup and restore, open-with actions, vision models, the browser, and the Linux environment. You choose the model and provider, and **you must supply your own API Key (BYOK)**.
-
-**What it can actually reach:**
-- **System:** Alarms, volume, media, and device status directly via Android APIs, without navigating through UI menus step by step.
-- **Screen:** An accessibility-based GUI Agent for tapping, scrolling, and typing; you can stop or take over at any time.
-- **Terminal:** Android Shell and Alpine / Debian Linux, capable of running files, scripts, and daemon tasks.
-- **On-device data:** Notifications, photos, calendars, SMS, etc.; some sources require Root, as well as a matching ROM and app.
-- **System entry points:** With LSPosed, it can take over the power button, Breeno, and Super XiaoAI, routing tasks from the original assistant entry points to EtaExpressive.
-
-Requires **Android 14 or later on ARM64 (arm64-v8a) devices**. The APK only packages ARM64 native libraries and does not provide 32-bit ARM or x86 builds. The app itself is not brand-locked, and core features do not require Root. Root and LSPosed can further unlock system access and assistant entry points, depending on authorization and ROM support.
-
-[Download APK](https://github.com/alone06101/EtaExpressive/releases/latest) · [Getting Started](#getting-started)
-
 ## Changes in This Fork
 Built on top of the [Eta upstream](https://github.com/Mangi-11/Eta), this fork primarily redesigns the interface appearance around the **Material Design 3 Expressive (M3E)** visual style and adds a batch of functional improvements. The following lists the core differences compared to the upstream (see commit history for full details):
 
@@ -53,6 +36,25 @@ This repository traces back through [Sam-Fic/EtaExpressive](https://github.com/S
 - **Build chain fixes**: Corrected the Compose AAR version downloaded by the `build-debug` workflow (aligned to `1.13.0-alpha01` with `ComposeSemanticsAarTransform.VERSION` and `libs.versions.toml`), stale version assertions in `buildSrc`, and an outdated expectation in the traversal patch test; the signature check now verifies this repository's own certificate.
 
 > Prompt behavior is identical to upstream whenever the provider system prompt is left blank.
+
+## About This Project
+
+**A System-Level Android AI Assistant That Steps Beyond the Sandbox**
+
+EtaExpressive is more than just a chat box. Connect your own model to your phone: it can call system APIs, see the screen, run a terminal, read and write files, and retrieve on-device information such as notifications, calendars, and photos. Asking questions and getting things done can happen seamlessly within the same conversation.
+
+It is based on [Eta](https://github.com/Mangi-11/Eta). The upstream project has built the Agent Runtime, system entry points, and tool layer; this project continues to improve daily usability: compression strategies, backup and restore, open-with actions, vision models, the browser, and the Linux environment. You choose the model and provider, and **you must supply your own API Key (BYOK)**.
+
+**What it can actually reach:**
+- **System:** Alarms, volume, media, and device status directly via Android APIs, without navigating through UI menus step by step.
+- **Screen:** An accessibility-based GUI Agent for tapping, scrolling, and typing; you can stop or take over at any time.
+- **Terminal:** Android Shell and Alpine / Debian Linux, capable of running files, scripts, and daemon tasks.
+- **On-device data:** Notifications, photos, calendars, SMS, etc.; some sources require Root, as well as a matching ROM and app.
+- **System entry points:** With LSPosed, it can take over the power button, Breeno, and Super XiaoAI, routing tasks from the original assistant entry points to EtaExpressive.
+
+Requires **Android 14 or later on ARM64 (arm64-v8a) devices**. The APK only packages ARM64 native libraries and does not provide 32-bit ARM or x86 builds. The app itself is not brand-locked, and core features do not require Root. Root and LSPosed can further unlock system access and assistant entry points, depending on authorization and ROM support.
+
+[Download APK](https://github.com/alone06101/EtaExpressive/releases/latest) · [Getting Started](#getting-started)
 
 ## Interface Preview
 | GUI Agent | Using as a System Voice Assistant |
