@@ -33,6 +33,7 @@
 - **服务商系统提示词恢复**：上游提交 `c0dc9aac` 以「运行时已使用助手提示词，提供商页的系统提示词只是残留设置」为由，整块删除了「AI 服务提供商」页的系统提示词输入，但 `ProviderSetting.systemPrompt` 与数据库 `system_prompt` 列始终保留，结果是「有值却看不见、改不了也清不掉」。本仓库恢复该入口与完整保存链路（草稿、状态保存、三语言文案），空串落库为 `null`，与「从未设置」等价。
 - **助手侧「跟随服务商」开关**：助手人格页新增开关（默认开启）。开启且当前服务商填写了系统提示词时，以它作为提示词基座，人格设定追加在后；关闭或服务商留空时完全沿用原行为。
 - **提示词优先级统一**：新增唯一合流点 `AssistantPrompt.runtimeBase`，优先级为「服务商提示词（跟随时）→ 助手人格 → 内置默认」，并接入 `buildRuntimeConfig`、外部入口归一化、派发工作会话回落与 `AssistantRepository.systemPrompt` 四处。老档案缺字段按默认值解码，无需数据库迁移。
+- **WebDAV 云端备份**：备份页新增云端通道。备份包上传到你自己的 WebDAV 服务器（Basic Auth），支持每天或每周自动备份，也可从云端逐条恢复。密码用 AndroidKeyStore 的 AES-GCM 硬件加密存储，密钥不出 TEE；界面上可临时切换明文视图核对，但落盘始终是密文。云端恢复与本地导入共用同一套校验链（format、schema 版本、体积上限），非本应用生成的包会被直接拒绝；上传与下载都走 cacheDir 临时文件并在完成后删除。
 - **构建链路修复**：修正 `build-debug` 工作流下载的 Compose AAR 版本（与 `ComposeSemanticsAarTransform.VERSION`、`libs.versions.toml` 对齐到 `1.13.0-alpha01`）、`buildSrc` 版本断言、以及 traversal 补丁测试的过期期望；签名校验改为校验本仓库自己的证书指纹。
 
 > 提示词行为：服务商提示词留空时，行为与上游完全一致。
