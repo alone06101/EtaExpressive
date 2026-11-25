@@ -58,7 +58,11 @@ class ExternalEntryPlainAssistantContract(unittest.TestCase):
         # All three identity carriers must be rewritten together.
         self.assertIn("assistantId = plain.id", body)
         self.assertIn("config = config.copy(", body)
-        self.assertIn("systemPrompt = AssistantPrompt.build(plain.name, plain.prompt)", body)
+        # 提示词同样必须按普通助手重写：走 runtimeBase 统一合流点（服务商提示词 + 人格）。
+        self.assertIn("systemPrompt = AssistantPrompt.runtimeBase(", body)
+        self.assertIn("name = plain.name", body)
+        self.assertIn("prompt = plain.prompt", body)
+        self.assertNotIn("AssistantPrompt.build(plain.name", body)
 
     def test_main_ui_new_conversation_shares_the_same_rule(self):
         body = method(self.app, "currentBoundAssistantId")
