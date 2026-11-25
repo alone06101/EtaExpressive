@@ -93,7 +93,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import io.github.mangi.eta.data.repository.RuntimeConfigRepository
-import io.github.mangi.eta.data.repository.ProviderRepository
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.concurrent.thread
@@ -2693,7 +2692,9 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
                 systemPrompt = AssistantPrompt.runtimeBase(
                     name = plain.name,
                     prompt = plain.prompt,
-                    providerPrompt = ProviderRepository.providerById(config.providerId)?.systemPrompt,
+                    // 本函数不是 suspend：服务商表要走内部已封装 runBlocking 的同步读取入口，
+                    // 直接调 suspend 的 ProviderRepository.providerById 会编译不过。
+                    providerPrompt = RuntimeConfigRepository.providerPrompt(config.providerId),
                     followProvider = plain.followProviderSystemPrompt,
                 ),
             ),
