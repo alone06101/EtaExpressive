@@ -2181,11 +2181,6 @@
   <string name="webdav_restore_summary">覆盖本机数据，操作前请确认</string>
   <string name="webdav_working">处理中…</string>
   <string name="webdav_done">完成</string>
-  <string name="action_copy_conversation">复制对话全文</string>
-  <string name="copy_conversation_done">已复制 %1$d 条消息</string>
-  <string name="copy_conversation_empty">这个会话还没有可复制的内容</string>
-  <string name="copy_conversation_truncated">内容过长，已复制开头部分</string>
-  <string name="copy_message_done">已复制</string>
   <string name="action_duplicate_conversation">创建会话副本</string>
   <string name="conversation_duplicate_suffix">（副本）</string>
   <string name="conversation_duplicate_done">已创建会话副本</string>

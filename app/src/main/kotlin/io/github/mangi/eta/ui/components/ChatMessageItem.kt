@@ -490,20 +490,6 @@ internal fun ChatMessageItem(
      */
     inWorkGroup: Boolean = false,
 ) {
-    // 长按消息复制正文：只对用户消息与助手回复生效（thinking/tool 是过程内容）。
-    // 用 onLongPressOnly 而不是 combinedClickable，气泡内的链接与按钮点击不受影响。
-    val copyContext = androidx.compose.ui.platform.LocalContext.current
-    val copyToClipboard = io.github.mangi.eta.ui.adaptive.rememberCopyToClipboard()
-    val longPressCopy: (String) -> Unit = { text ->
-        if (text.isNotBlank()) {
-            copyToClipboard(text)
-            android.widget.Toast.makeText(
-                copyContext,
-                copyContext.getString(R.string.copy_message_done),
-                android.widget.Toast.LENGTH_SHORT,
-            ).show()
-        }
-    }
     when (message) {
         is io.github.mangi.eta.ui.model.AgentQuestionMessageUi -> AgentQuestionCard(message, modifier,
             position = segmentedPosition,
@@ -538,7 +524,7 @@ internal fun ChatMessageItem(
             onEdit = { actions.onEditMessage(message.id) },
             onDelete = { actions.onDeleteMessage(message.id) },
             onBranch = { actions.onBranchMessage(message.id) },
-            modifier = modifier.onLongPressOnly { longPressCopy(message.content) },
+            modifier = modifier,
         )
         is AgentMessageUi -> AgentMessageBlock(
             message = message,
@@ -553,7 +539,7 @@ internal fun ChatMessageItem(
             onDelete = { actions.onDeleteMessage(message.id) },
             onRegenerate = { actions.onRegenerateMessage(message.id) },
             onBranch = { actions.onBranchMessage(message.id) },
-            modifier = modifier.onLongPressOnly { longPressCopy(message.content) },
+            modifier = modifier,
         )
         is ErrorReconnectMessageUi -> ErrorReconnectDivider(message, modifier)
         is SystemNoticeMessageUi -> if (message.code == SystemNoticeCode.RuntimeFailed) {

@@ -2313,11 +2313,6 @@
   <string name="webdav_restore_summary">Overwrites local data, confirm before continuing</string>
   <string name="webdav_working">Working…</string>
   <string name="webdav_done">Done</string>
-  <string name="action_copy_conversation">Copy conversation</string>
-  <string name="copy_conversation_done">Copied %1$d messages</string>
-  <string name="copy_conversation_empty">This conversation has nothing to copy yet</string>
-  <string name="copy_conversation_truncated">Too long, copied the beginning only</string>
-  <string name="copy_message_done">Copied</string>
   <string name="action_duplicate_conversation">Duplicate conversation</string>
   <string name="conversation_duplicate_suffix"> (copy)</string>
   <string name="conversation_duplicate_done">Conversation copy created</string>
