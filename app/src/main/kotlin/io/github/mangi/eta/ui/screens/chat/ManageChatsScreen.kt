@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Download
@@ -35,6 +36,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -42,6 +44,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -66,7 +70,9 @@ import io.github.mangi.eta.ui.adaptive.EtaMenuEntry
 import io.github.mangi.eta.ui.adaptive.EtaScaffoldPage
 import io.github.mangi.eta.ui.adaptive.EtaSegmentedColumn
 import io.github.mangi.eta.ui.adaptive.EtaSegmentedGroupSpacing
+import io.github.mangi.eta.data.repository.ConversationPlainText
 import io.github.mangi.eta.ui.adaptive.EtaSegmentedRow
+import io.github.mangi.eta.ui.adaptive.rememberCopyToClipboard
 import io.github.mangi.eta.ui.adaptive.EtaSelectionAction
 import io.github.mangi.eta.ui.adaptive.EtaSelectionBar
 import io.github.mangi.eta.ui.adaptive.EtaSelectionBarOverlay
@@ -88,6 +94,7 @@ import io.github.mangi.eta.ui.haptics.TouchHaptics
 import io.github.mangi.eta.ui.model.ConversationFolderUi
 import io.github.mangi.eta.ui.model.ConversationSummaryUi
 import io.github.mangi.eta.ui.remote.RemoteCoordinator
+import kotlinx.coroutines.launch
 
 /** 管理页列表顺序。已有会话保持原位；新会话按当前列表里的相对顺序插到最前。置顶变化才整表重排。 */
 internal fun stableManageChatOrder(
@@ -166,6 +173,10 @@ internal fun ManageChatsScreen(
     var renameTarget by remember { mutableStateOf<ConversationFolderUi?>(null) }
     var deleteTarget by remember { mutableStateOf<ConversationFolderUi?>(null) }
     val view = LocalView.current
+    // 复制会话全文：读 DB 拼纯文本，多个会话按顺序拼接并共享同一长度上限。
+    val copyContext = LocalContext.current
+    val copyToClipboard = rememberCopyToClipboard()
+    val copyScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     val fabExpanded by rememberFabExpandedState(listState)
     // 批量删除确认弹窗（会话与分类共用开关，按 selectionTarget 取不同文案与执行口径）。
@@ -526,6 +537,44 @@ internal fun ManageChatsScreen(
                         )
                     }
                     // 删除是破坏性操作：error 色图标区分，执行前另有确认弹窗。
+                    if (selectionTarget == ManageSelectionTarget.Chats) {
+                        // 复制所选会话的全文：按勾选顺序拼接，共享同一个长度上限，
+                        // 超限就停在该处并提示，避免把几 MB 文本塞进剪贴板。
+                        add(
+                            EtaSelectionAction(
+                                icon = Icons.Rounded.ContentCopy,
+                                contentDescription = stringResource(R.string.action_copy_conversation),
+                                onClick = {
+                                    TouchHaptics.click(view)
+                                    val ids = selectedIds.toList()
+                                    copyScope.launch {
+                                        val builder = StringBuilder()
+                                        var truncated = false
+                                        for (id in ids) {
+                                            val piece = runCatching {
+                                                ConversationPlainText.build(copyContext, id)
+                                            }.getOrNull()?.text.orEmpty()
+                                            if (piece.isBlank()) continue
+                                            val block = if (builder.isEmpty()) piece else "\n\n------------\n\n" + piece
+                                            if (builder.length + block.length > ConversationPlainText.MAX_CHARS) {
+                                                truncated = true
+                                                break
+                                            }
+                                            builder.append(block)
+                                        }
+                                        val text = builder.toString().trim()
+                                        val message = when {
+                                            text.isBlank() -> copyContext.getString(R.string.copy_conversation_empty)
+                                            truncated -> copyContext.getString(R.string.copy_conversation_truncated)
+                                            else -> copyContext.getString(R.string.copy_conversation_done, ids.size)
+                                        }
+                                        if (text.isNotBlank()) copyToClipboard(text)
+                                        Toast.makeText(copyContext, message, Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                            ),
+                        )
+                    }
                     add(
                         EtaSelectionAction(
                             icon = Icons.Rounded.Delete,

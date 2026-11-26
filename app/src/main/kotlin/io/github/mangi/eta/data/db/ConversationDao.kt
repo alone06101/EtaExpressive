@@ -51,6 +51,17 @@ internal interface ConversationDao {
         "FROM conversation_messages WHERE conversation_id = :id " +
         "AND type IN ('user', 'assistant', 'thinking', 'tool') ORDER BY sort_index ASC LIMIT :limit OFFSET :offset")
     suspend fun searchablePage(id: String, limit: Int, offset: Int): List<ConversationTextRow>
+    /**
+     * 取会话里可复制到剪贴板的消息（用户与助手）。
+     *
+     * 只取这两类：thinking、tool 是过程性内容，复制出去对用户没有意义，
+     * 也是长度失控的主要来源。不加 LIMIT——「复制全文」语义上就该是全文，
+     * 由调用方按需截断并提示。
+     */
+    @Query("SELECT id, conversation_id, type, content, tool_name, tool_status, arguments_summary, result_summary " +
+        "FROM conversation_messages WHERE conversation_id = :id " +
+        "AND type IN ('user', 'assistant') ORDER BY sort_index ASC")
+    suspend fun copyableMessages(id: String): List<ConversationTextRow>
 
     @Query("SELECT DISTINCT conversation_id FROM conversation_messages " +
         "WHERE type = 'question' AND conversation_id IN " +

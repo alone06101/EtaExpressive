@@ -1,5 +1,6 @@
 package io.github.mangi.eta.ui.components
 
+import android.widget.Toast
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector
 import androidx.compose.animation.core.DecayAnimationSpec
@@ -11,6 +12,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import io.github.mangi.eta.agent.remote.RemoteConnectionStatus
 import io.github.mangi.eta.agent.remote.RemoteSessionInfo
+import io.github.mangi.eta.data.repository.ConversationPlainText
+import io.github.mangi.eta.ui.adaptive.rememberCopyToClipboard
 import io.github.mangi.eta.ui.remote.remoteStatusLabel
 import io.github.mangi.eta.ui.model.RemotePaneServer
 import androidx.compose.foundation.gestures.Orientation
@@ -61,6 +64,7 @@ import androidx.compose.material.icons.rounded.ManageHistory
 import androidx.compose.material.icons.automirrored.rounded.Chat
 import androidx.compose.material.icons.rounded.AddComment
 import androidx.compose.material.icons.rounded.BarChart
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Download
@@ -144,6 +148,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -1422,6 +1427,10 @@ private fun Material3ConversationRow(
     modifier: Modifier = Modifier,
 ) {
     var showActionMenu by remember { mutableStateOf(false) }
+    // 复制会话全文：只读 DB 拼纯文本，不经过导出流程（不需要 SAF 选文件）。
+    val context = LocalContext.current
+    val copyToClipboard = rememberCopyToClipboard()
+    val copyScope = rememberCoroutineScope()
     // 「等待回答」问号徽标的读屏说明（行尾 trailing 槽内引用）。
     val waitingBadgeDescription = stringResource(R.string.dispatch_question_waiting_badge)
     EtaSegmentedItem(index = index, count = count) {
@@ -1558,7 +1567,7 @@ private fun Material3ConversationRow(
                         // 调度台是系统条目：显示名固定，但重命名仍改真实标题；取消置顶、
                         // 移动到分类与删除入口不提供（分类归属是普通会话的整理属性）。
                         val systemEntry = conversation.isDispatchConsole
-                        val actionCount = if (systemEntry) 3 else 6
+                        val actionCount = if (systemEntry) 4 else 7
                         var actionIndex = 0
                         DrawerActionMenuItem(
                             index = actionIndex++,
@@ -1585,6 +1594,30 @@ private fun Material3ConversationRow(
                                 },
                             )
                         }
+                        DrawerActionMenuItem(
+                            index = actionIndex++,
+                            count = actionCount,
+                            text = stringResource(R.string.action_copy_conversation),
+                            icon = Icons.Rounded.ContentCopy,
+                            onClick = {
+                                showActionMenu = false
+                                copyScope.launch {
+                                    val result = runCatching {
+                                        ConversationPlainText.build(context, conversation.id)
+                                    }.getOrNull()
+                                    val message = when {
+                                        result == null || result.text.isBlank() ->
+                                            context.getString(R.string.copy_conversation_empty)
+                                        result.truncated ->
+                                            context.getString(R.string.copy_conversation_truncated)
+                                        else ->
+                                            context.getString(R.string.copy_conversation_done, result.messageCount)
+                                    }
+                                    result?.text?.takeIf { it.isNotBlank() }?.let(copyToClipboard)
+                                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                        )
                         DrawerActionMenuItem(
                             index = actionIndex++,
                             count = actionCount,
