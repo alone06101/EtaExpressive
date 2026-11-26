@@ -54,6 +54,7 @@ import io.github.mangi.eta.agent.model.AgentImageGenerationClient
 import io.github.mangi.eta.agent.model.AgentImageGenerationParser
 import io.github.mangi.eta.agent.model.AgentModelClient
 import io.github.mangi.eta.agent.model.ImageIntent
+import io.github.mangi.eta.agent.model.VideoIntent
 import io.github.mangi.eta.agent.model.AgentTurnIdentity
 import io.github.mangi.eta.agent.model.AgentVideoGenerationClient
 import io.github.mangi.eta.agent.model.AgentVideoGenerationParser
@@ -5301,19 +5302,26 @@ internal class AgentAppState(
             Toast.makeText(appContext, appContext.getString(R.string.appst_bound_model_unavailable), Toast.LENGTH_LONG).show()
             return
         }
-        // 用户明确要出图、而当前模型不能生成图像时，按协助顺序临时交给图像模型。
-        // 只在「当前既不会出图也不会出视频」且文本是明确的画图请求时才生效；
+        // 用户明确要出图/出视频、而当前模型做不到时，按协助顺序临时交给对应的生成模型。
+        // 两类分别判定：会出图的模型未必会出视频，反之亦然。
         // 下一轮仍按选中模型重新取快照，不需要恢复动作。
-        val imageAssist = if (
-            !runModel.supportsImageGeneration && !runModel.supportsVideoGeneration &&
-            ImageIntent.wantsImage(prompt)
-        ) {
-            CapabilityAssistRouter.pickImageModelBlocking(excludedProviderId = runProvider.id)
-        } else {
-            null
+        val wantsVideo = VideoIntent.wantsVideo(prompt)
+        val wantsImage = !wantsVideo && ImageIntent.wantsImage(prompt)
+        val mediaAssist = when {
+            wantsVideo && !runModel.supportsVideoGeneration ->
+                CapabilityAssistRouter.pickMediaModelBlocking(
+                    CapabilityAssistRouter.MediaOutputKind.VIDEO,
+                    excludedProviderId = runProvider.id,
+                )
+            wantsImage && !runModel.supportsImageGeneration ->
+                CapabilityAssistRouter.pickMediaModelBlocking(
+                    CapabilityAssistRouter.MediaOutputKind.IMAGE,
+                    excludedProviderId = runProvider.id,
+                )
+            else -> null
         }
-        val effectiveProvider = imageAssist?.first ?: runProvider
-        val effectiveModel = imageAssist?.second ?: runModel
+        val effectiveProvider = mediaAssist?.first ?: runProvider
+        val effectiveModel = mediaAssist?.second ?: runModel
         if (effectiveModel.supportsSpeechSynthesis) {
             Toast.makeText(appContext, appContext.getString(R.string.appst_tts_model_chat_unsupported), Toast.LENGTH_LONG).show()
             return

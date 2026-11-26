@@ -91,16 +91,21 @@ internal object CapabilityAssistRouter {
         config
     }
 
+    /** 本轮需要的媒体输出类型。 */
+    enum class MediaOutputKind { IMAGE, VIDEO }
+
     /**
-     * 为「本轮要出图」挑一个图像生成模型。
+     * 为「本轮要出图/出视频」挑一个能生成的模型。
      *
-     * 与输入能力路由分开：输入能力换的是「谁来看图」，这里换的是「谁来画图」，
-     * 判定的是输出能力（supportsImageGeneration）。顺序同样取协助设置的 providerOrder，
-     * 为空时按现有提供商顺序。
+     * 与输入能力路由分开：输入换的是「谁来看图」，这里换的是「谁来画」，
+     * 判定的是输出能力（supportsImageGeneration / supportsVideoGeneration）。
+     * 顺序同样取协助设置的 providerOrder，为空时按现有提供商顺序。
      *
-     * @return 命中的提供商与模型；首选自己就能出图、或没有任何候选时返回 null
+     * 图像会排除同时被判定为视频模型的条目：那类模型的调用形态是视频任务，
+     * 拿它接图像请求会得到意料之外的结果。
      */
-    suspend fun pickImageModel(
+    suspend fun pickMediaModel(
+        kind: MediaOutputKind,
         excludedProviderId: String?,
     ): Pair<ProviderSetting, Model>? = withContext(Dispatchers.IO) {
         val settings = runCatching { SettingsDataStore.capabilityAssist() }.getOrNull() ?: return@withContext null
@@ -111,27 +116,35 @@ internal object CapabilityAssistRouter {
             val provider = runCatching { ProviderRepository.providerById(providerId) }
                 .getOrNull()?.takeIf { it.isEnabled } ?: continue
             val model = provider.models
-                .filter { it.isEnabled && it.supportsImageGeneration && !it.supportsVideoGeneration }
+                .filter { it.isEnabled && matchesMediaOutput(it, kind) }
                 .sortedBy { it.sortOrder }
                 .firstOrNull() ?: continue
             AndroidAgentLogger.debug {
-                "capability assist (image output): ${provider.id}/${model.modelId}"
+                "capability assist (${kind.name.lowercase()} output): ${provider.id}/${model.modelId}"
             }
             return@withContext provider to model
         }
         null
     }
 
+    private fun matchesMediaOutput(model: Model, kind: MediaOutputKind): Boolean = when (kind) {
+        MediaOutputKind.IMAGE -> model.supportsImageGeneration && !model.supportsVideoGeneration
+        MediaOutputKind.VIDEO -> model.supportsVideoGeneration
+    }
+
     /**
      * 给非 suspend 的发送路径用的同步入口。
      *
-     * 只有「用户明确要出图、而当前模型不能出图」时才会被调用，属于低频路径：
-     * 普通消息在调用前就被 ImageIntent 挡掉了，不会付出阻塞代价。
+     * 只有「用户明确要出图/出视频、而当前模型做不到」时才会被调用，属于低频路径：
+     * 普通消息在调用前就被意图判定挡掉了，不会付出阻塞代价。
      * 读的是本地 DataStore + provider 表，量级很小。
      */
-    fun pickImageModelBlocking(excludedProviderId: String?): Pair<ProviderSetting, Model>? =
+    fun pickMediaModelBlocking(
+        kind: MediaOutputKind,
+        excludedProviderId: String?,
+    ): Pair<ProviderSetting, Model>? =
         runCatching {
-            kotlinx.coroutines.runBlocking { pickImageModel(excludedProviderId) }
+            kotlinx.coroutines.runBlocking { pickMediaModel(kind, excludedProviderId) }
         }.getOrNull()
 
     private suspend fun enabledProviderIds(): List<String> =
