@@ -53,6 +53,7 @@ import io.github.mangi.eta.agent.model.AgentConversationCodec
 import io.github.mangi.eta.agent.model.AgentImageGenerationClient
 import io.github.mangi.eta.agent.model.AgentImageGenerationParser
 import io.github.mangi.eta.agent.model.AgentModelClient
+import io.github.mangi.eta.agent.model.ImageIntent
 import io.github.mangi.eta.agent.model.AgentTurnIdentity
 import io.github.mangi.eta.agent.model.AgentVideoGenerationClient
 import io.github.mangi.eta.agent.model.AgentVideoGenerationParser
@@ -5300,7 +5301,20 @@ internal class AgentAppState(
             Toast.makeText(appContext, appContext.getString(R.string.appst_bound_model_unavailable), Toast.LENGTH_LONG).show()
             return
         }
-        if (runModel.supportsSpeechSynthesis) {
+        // 用户明确要出图、而当前模型不能生成图像时，按协助顺序临时交给图像模型。
+        // 只在「当前既不会出图也不会出视频」且文本是明确的画图请求时才生效；
+        // 下一轮仍按选中模型重新取快照，不需要恢复动作。
+        val imageAssist = if (
+            !runModel.supportsImageGeneration && !runModel.supportsVideoGeneration &&
+            ImageIntent.wantsImage(prompt)
+        ) {
+            CapabilityAssistRouter.pickImageModelBlocking(excludedProviderId = runProvider.id)
+        } else {
+            null
+        }
+        val effectiveProvider = imageAssist?.first ?: runProvider
+        val effectiveModel = imageAssist?.second ?: runModel
+        if (effectiveModel.supportsSpeechSynthesis) {
             Toast.makeText(appContext, appContext.getString(R.string.appst_tts_model_chat_unsupported), Toast.LENGTH_LONG).show()
             return
         }
@@ -5309,17 +5323,19 @@ internal class AgentAppState(
         // Resolve and freeze the remembered mode for THIS submitted binding before any coroutine.
         // Later UI toggles must not mutate an in-flight request or affect a different model.
         val runConfig = GptSpeedModePolicy.snapshot(
-            RuntimeConfigRepository.buildRuntimeConfig(runProvider, runModel, runAssistant),
+            RuntimeConfigRepository.buildRuntimeConfig(effectiveProvider, effectiveModel, runAssistant),
             rememberedGptSpeedMode(state.providerId, state.modelId),
-            supportsGptSpeedBinding(runProvider, runModel),
+            supportsGptSpeedBinding(effectiveProvider, effectiveModel),
         )
-        val runModelOption = AgentModelPickerProjector.project(listOf(runProvider), runProvider.id, runModel.id).selectedModel
+        val runModelOption = AgentModelPickerProjector.project(
+            listOf(effectiveProvider), effectiveProvider.id, effectiveModel.id,
+        ).selectedModel
         val runProviders = selectionProviders.toList()
         val taggedUserHistoryMessage = userHistoryMessage.copy(turnId = logicalTurnId)
         bindUsageRun(runId, conversationId)
         runConfig.contextWindow?.takeIf { it > 0 }?.let { runContextWindows[runId] = it }
-        val generateVideo = runModel.supportsVideoGeneration
-        val generateImage = !generateVideo && runModel.supportsImageGeneration
+        val generateVideo = effectiveModel.supportsVideoGeneration
+        val generateImage = !generateVideo && effectiveModel.supportsImageGeneration
         val mediaController = if (generateImage || generateVideo) {
             imageGenerationRunIds += runId
             directMediaRuns.start(runId)

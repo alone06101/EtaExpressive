@@ -4,7 +4,9 @@ import io.github.mangi.eta.agent.model.AgentModelClient
 import io.github.mangi.eta.data.model.ReasoningEffort
 import io.github.mangi.eta.core.AndroidAgentLogger
 import io.github.mangi.eta.data.datastore.SettingsDataStore
+import io.github.mangi.eta.data.model.Model
 import io.github.mangi.eta.data.model.ProviderAuthModes
+import io.github.mangi.eta.data.model.ProviderSetting
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -88,6 +90,49 @@ internal object CapabilityAssistRouter {
         }
         config
     }
+
+    /**
+     * 为「本轮要出图」挑一个图像生成模型。
+     *
+     * 与输入能力路由分开：输入能力换的是「谁来看图」，这里换的是「谁来画图」，
+     * 判定的是输出能力（supportsImageGeneration）。顺序同样取协助设置的 providerOrder，
+     * 为空时按现有提供商顺序。
+     *
+     * @return 命中的提供商与模型；首选自己就能出图、或没有任何候选时返回 null
+     */
+    suspend fun pickImageModel(
+        excludedProviderId: String?,
+    ): Pair<ProviderSetting, Model>? = withContext(Dispatchers.IO) {
+        val settings = runCatching { SettingsDataStore.capabilityAssist() }.getOrNull() ?: return@withContext null
+        if (!settings.enabled) return@withContext null
+        val candidates = settings.providerOrder.ifEmpty { enabledProviderIds() }
+        for (providerId in candidates) {
+            if (providerId == excludedProviderId) continue
+            val provider = runCatching { ProviderRepository.providerById(providerId) }
+                .getOrNull()?.takeIf { it.isEnabled } ?: continue
+            val model = provider.models
+                .filter { it.isEnabled && it.supportsImageGeneration && !it.supportsVideoGeneration }
+                .sortedBy { it.sortOrder }
+                .firstOrNull() ?: continue
+            AndroidAgentLogger.debug {
+                "capability assist (image output): ${provider.id}/${model.modelId}"
+            }
+            return@withContext provider to model
+        }
+        null
+    }
+
+    /**
+     * 给非 suspend 的发送路径用的同步入口。
+     *
+     * 只有「用户明确要出图、而当前模型不能出图」时才会被调用，属于低频路径：
+     * 普通消息在调用前就被 ImageIntent 挡掉了，不会付出阻塞代价。
+     * 读的是本地 DataStore + provider 表，量级很小。
+     */
+    fun pickImageModelBlocking(excludedProviderId: String?): Pair<ProviderSetting, Model>? =
+        runCatching {
+            kotlinx.coroutines.runBlocking { pickImageModel(excludedProviderId) }
+        }.getOrNull()
 
     private suspend fun enabledProviderIds(): List<String> =
         runCatching {
