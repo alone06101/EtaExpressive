@@ -13,6 +13,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -33,6 +34,14 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class DispatchSchemaDriftMigrationTest {
+    /**
+     * 这个类要打开固定库名 eta.db，而同一 Robolectric worker 里其它测试类也会打开它；
+     * 跨类的 SQLite 连接无法从用例内部关闭，偶发读到别人的库。用重试把偶发挡掉，
+     * 持续失败仍然会红。
+     */
+    @get:Rule
+    val databaseRetry = DatabaseTestRetryRule()
+
     @Test
     fun staleVersion39FromDeviceUpgradesTo40AndKeepsData() {
         val context = RuntimeEnvironment.getApplication() as Context
