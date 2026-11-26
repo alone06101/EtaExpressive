@@ -68,10 +68,15 @@ internal object WebDavAutoBackup {
         }
     }
 
-    /** 保存设置后调用：立即触发一次（用户要求「立即」），随后按周期重排。 */
-    fun onSettingsSaved(context: Context, settings: WebDavSettings) {
+    /**
+     * 保存设置后调用：按周期重排闹钟，并在需要时立即触发一次。
+     *
+     * [runImmediately] 由调用方按「连接参数是否真的变了」决定：只改内容选项或间隔时
+     * 再传一轮几十兆的包没有意义，还会让用户以为每次改设置都在重复上传。
+     */
+    fun onSettingsSaved(context: Context, settings: WebDavSettings, runImmediately: Boolean = true) {
         schedule(context, settings)
-        if (settings.autoBackupEnabled && settings.configured) runAuto(context)
+        if (runImmediately && settings.autoBackupEnabled && settings.configured) runAuto(context)
     }
 
     private fun pendingIntent(context: Context): PendingIntent {

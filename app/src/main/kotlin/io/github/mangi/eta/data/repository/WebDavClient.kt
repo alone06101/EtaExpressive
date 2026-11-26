@@ -138,18 +138,21 @@ internal class WebDavClient(
          */
         fun parseEntries(xml: String): List<WebDavBackupEntry> {
             if (xml.isBlank()) return emptyList()
-            val hrefs = HREF.findAll(xml).map { it.groupValues[1] }.toList()
-            val dates = LASTMODIFIED.findAll(xml).map { it.groupValues[1] }.toList()
-            return hrefs.mapIndexedNotNull { index, raw ->
-                val name = raw.trimEnd('/').substringAfterLast('/')
-                if (!name.endsWith(".zip", ignoreCase = true)) return@mapIndexedNotNull null
+            // 按 <d:response> 块解析，而不是把全表的 href 与 lastmodified 各自拉成列表再按索引配对：
+            // 目录条目通常没有 getlastmodified，一旦缺失，后面对齐会整体错位，时间全配错。
+            return RESPONSE.findAll(xml).mapNotNull { block ->
+                val body = block.value
+                val href = HREF.find(body)?.groupValues?.getOrNull(1) ?: return@mapNotNull null
+                val name = href.trimEnd('/').substringAfterLast('/')
+                if (!name.endsWith(".zip", ignoreCase = true)) return@mapNotNull null
                 WebDavBackupEntry(
                     fileName = java.net.URLDecoder.decode(name, "UTF-8"),
-                    lastModified = dates.getOrNull(index)?.trim().orEmpty(),
+                    lastModified = LASTMODIFIED.find(body)?.groupValues?.getOrNull(1)?.trim().orEmpty(),
                 )
             }.distinctBy { it.fileName }.sortedByDescending { it.fileName }
         }
 
+        private val RESPONSE = Regex("<(?:d:|D:)?response>(.*?)</(?:d:|D:)?response>", RegexOption.DOT_MATCHES_ALL)
         private val HREF = Regex("<(?:d:|D:)?href>([^<]+)</(?:d:|D:)?href>")
         private val LASTMODIFIED = Regex("<(?:d:|D:)?getlastmodified>([^<]+)</(?:d:|D:)?getlastmodified>")
     }

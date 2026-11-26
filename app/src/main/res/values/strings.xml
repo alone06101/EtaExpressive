@@ -2318,6 +2318,7 @@
   <string name="conversation_duplicate_done">Conversation copy created</string>
   <string name="conversation_duplicate_failed">Failed to create a copy</string>
   <string name="conversation_duplicate_busy">Creating a copy, please wait</string>
+  <string name="webdav_password_encrypt_failed">Cannot encrypt the password (keystore unavailable); it was not saved</string>
   <string name="provider_system_prompt_title">System prompt</string>
   <string name="provider_system_prompt_label">System prompt</string>
   <string name="provider_system_prompt_summary">Leave blank to skip. When the assistant follows the provider and this is filled, the runtime uses it as the base prompt and appends the personality and capability blocks after it.</string>

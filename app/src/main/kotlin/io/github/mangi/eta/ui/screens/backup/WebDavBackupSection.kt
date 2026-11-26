@@ -1,5 +1,6 @@
 package io.github.mangi.eta.ui.screens.backup
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -76,11 +77,19 @@ internal fun WebDavBackupSection(
     }
 
     // 组装待保存设置；密码留空则沿用已有密文。
-    fun draft(): WebDavSettings {
+    // 加密不可用时返回 null 并提示：静默沿用旧密文会让用户以为新密码已生效。
+    fun draft(): WebDavSettings? {
         val encrypted = if (passwordInput.isEmpty()) {
             settings.passwordEncrypted
         } else {
-            WebDavSecretCipher.encrypt(passwordInput) ?: settings.passwordEncrypted
+            WebDavSecretCipher.encrypt(passwordInput) ?: run {
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.webdav_password_encrypt_failed),
+                    Toast.LENGTH_SHORT,
+                ).show()
+                return null
+            }
         }
         return settings.copy(
             serverUrl = serverUrl.trim(),
@@ -91,11 +100,18 @@ internal fun WebDavBackupSection(
     }
 
     fun persist(next: WebDavSettings, restartAlarm: Boolean = true) {
+        // 只有连接参数真的变了才值得立刻传一轮包；仅切换内容选项或周期时只重排闹钟。
+        val connectionChanged = next.serverUrl != settings.serverUrl ||
+            next.username != settings.username ||
+            next.passwordEncrypted != settings.passwordEncrypted ||
+            next.remoteDirectory != settings.remoteDirectory
         scope.launch {
             withContext(Dispatchers.IO) { SettingsDataStore.setWebDavSettings(next) }
             settings = next
             passwordInput = ""
-            if (restartAlarm) WebDavAutoBackup.onSettingsSaved(context, next)
+            if (restartAlarm) {
+                WebDavAutoBackup.onSettingsSaved(context, next, runImmediately = connectionChanged)
+            }
         }
     }
 
@@ -170,7 +186,8 @@ internal fun WebDavBackupSection(
                 checked = settings.autoBackupEnabled,
                 enabled = !busy,
                 onCheckedChange = { enabled ->
-                    val next = draft().withExportOptions(exportOptions).copy(autoBackupEnabled = enabled)
+                    val next = (draft() ?: return@EtaSwitchRow)
+                        .withExportOptions(exportOptions).copy(autoBackupEnabled = enabled)
                     persist(next)
                     // 开启时立即跑一次（用户明确要求），关掉则只取消闹钟。
                     if (enabled) run(context.getString(R.string.webdav_upload_label)) {
@@ -186,7 +203,7 @@ internal fun WebDavBackupSection(
                 checked = settings.autoBackupInterval == WebDavSettings.INTERVAL_WEEKLY,
                 enabled = !busy && settings.autoBackupEnabled,
                 onCheckedChange = { weekly ->
-                    val next = draft().copy(
+                    val next = (draft() ?: return@EtaSwitchRow).copy(
                         autoBackupInterval = if (weekly) WebDavSettings.INTERVAL_WEEKLY else WebDavSettings.INTERVAL_DAILY,
                     )
                     persist(next)
@@ -201,7 +218,7 @@ internal fun WebDavBackupSection(
                 loading = busy,
                 enabled = !busy,
                 onClick = {
-                    val next = draft()
+                    val next = draft() ?: return@BackupActionRow
                     persist(next, restartAlarm = false)
                     run(context.getString(R.string.webdav_test)) { WebDavBackupManager.test(context, next) }
                 },
@@ -216,7 +233,7 @@ internal fun WebDavBackupSection(
                 enabled = !busy,
                 onClick = {
                     // 勾选固化进设置：本次与后续自动备份都按同一套内容打包。
-                    val next = draft().withExportOptions(exportOptions)
+                    val next = (draft() ?: return@BackupActionRow).withExportOptions(exportOptions)
                     persist(next, restartAlarm = false)
                     run(context.getString(R.string.webdav_upload_label)) {
                         WebDavBackupManager.uploadManually(context, next, exportOptions)
@@ -238,7 +255,7 @@ internal fun WebDavBackupSection(
                 loading = busy,
                 enabled = !busy,
                 onClick = {
-                    val next = draft()
+                    val next = draft() ?: return@BackupActionRow
                     persist(next, restartAlarm = false)
                     run(context.getString(R.string.webdav_list)) {
                         val entries = WebDavBackupManager.list(context, next)
@@ -257,7 +274,7 @@ internal fun WebDavBackupSection(
                     loading = busy,
                     enabled = !busy,
                     onClick = {
-                        val next = draft()
+                        val next = draft() ?: return@onClick
                         run(context.getString(R.string.webdav_restore_label)) {
                             WebDavBackupManager.restore(context, next, entry.fileName)
                         }

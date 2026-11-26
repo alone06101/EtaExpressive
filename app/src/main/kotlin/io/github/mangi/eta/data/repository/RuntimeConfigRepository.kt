@@ -226,6 +226,12 @@ internal object RuntimeConfigRepository {
      */
     internal fun providerPrompt(providerId: String): String? =
         runCatching { kotlinx.coroutines.runBlocking { ProviderRepository.providerById(providerId) } }
+            .onFailure {
+                // 静默吞掉等于「外部入口的服务商提示词偶尔莫名丢失」，至少留一条类型日志。
+                io.github.mangi.eta.core.AndroidAgentLogger.warn(
+                    "provider prompt read failed: ${'$'}{it.javaClass.simpleName}",
+                )
+            }
             .getOrNull()?.systemPrompt?.takeIf { it.isNotBlank() }
 
     internal suspend fun configForProviderAndModel(

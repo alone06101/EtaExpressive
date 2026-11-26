@@ -9,7 +9,10 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
@@ -28,6 +31,12 @@ internal object WebDavBackupManager {
     /** 防抖窗口：距上次不足周期的 90% 就跳过，避免闹钟漂移导致重复上传。 */
     private const val DEBOUNCE_RATIO = 0.9
 
+    /** 自动备份失败后的重试延迟：比立刻重试温和，又不必等满一个周期。 */
+    private const val RETRY_DELAY_MS = 15 * 60 * 1000L
+
+    /** 上传全局互斥：闹钟触发与「保存后立即备份」可能同时发生。 */
+    private val uploadMutex = Mutex()
+
     private val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US)
 
     /** 生成备份并上传，返回远端文件名。 */
@@ -35,14 +44,19 @@ internal object WebDavBackupManager {
         context: Context,
         settings: WebDavSettings,
         options: EtaBackupExportOptions = settings.exportOptions(),
-    ): String = withContext(Dispatchers.IO) {
+    ): String = uploadMutex.withLock {
+        withContext(Dispatchers.IO) {
         val app = context.applicationContext
         val password = WebDavSecretCipher.decrypt(settings.passwordEncrypted)
             ?: throw WebDavException("保存的密码无法解密，请重新填写")
         val client = clientFor(settings, password)
         val directory = settings.remoteDirectory.trim().trim('/')
-        val fileName = FILE_PREFIX + stamp.format(Date()) + ".zip"
-        val temp = File(app.cacheDir, "webdav-upload.zip")
+        // 文件名带毫秒与随机后缀：闹钟触发与「保存后立即备份」可能落在同一秒，
+        // 秒级时间戳会让远端同名互相覆盖。
+        val suffix = UUID.randomUUID().toString().take(4)
+        val fileName = FILE_PREFIX + stamp.format(Date()) + "-" + suffix + ".zip"
+        // 临时文件同样带随机名：并发上传若共用一个路径，会写坏同一个包。
+        val temp = File(app.cacheDir, "webdav-upload-" + UUID.randomUUID() + ".zip")
         try {
             temp.outputStream().use { out -> EtaBackupRepository.export(app, out, options) }
             if (directory.isNotEmpty()) client.ensureDirectory(directory)
@@ -51,14 +65,17 @@ internal object WebDavBackupManager {
         } finally {
             runCatching { temp.delete() }
         }
+        }
     }
 
     /** 云端备份列表；未配置或缺密码返回空表，界面按「云端没有备份」呈现。 */
     suspend fun list(context: Context, settings: WebDavSettings): List<WebDavBackupEntry> =
         withContext(Dispatchers.IO) {
             if (!settings.configured) return@withContext emptyList()
+            // 解密失败与「云端确实没有备份」是两件事：前者要用户重填密码，
+            // 返回空表会让界面显示「云端没有备份」，把真实原因藏起来。
             val password = WebDavSecretCipher.decrypt(settings.passwordEncrypted)
-                ?: return@withContext emptyList()
+                ?: throw WebDavException("保存的密码无法解密，请重新填写")
             clientFor(settings, password).list(settings.remoteDirectory.trim().trim('/'))
         }
 
@@ -120,8 +137,12 @@ internal object WebDavBackupManager {
             }
             .onFailure { error ->
                 AndroidAgentLogger.warn("WebDAV auto backup failed: ${'$'}{error.safeLogType()}")
+                // 失败也推进时间戳会把「每天备份」拖成失败后 21.6 小时才重试。
+                // 这里把时间戳回拨到「防抖刚好在 RETRY_DELAY_MS 后满足」的位置，
+                // 既不会立刻重试刷请求，也不用等满一个周期。
+                val retryBase = now - (settings.intervalMillis * DEBOUNCE_RATIO).toLong() + RETRY_DELAY_MS
                 SettingsDataStore.setWebDavSettings(
-                    settings.copy(lastBackupAtMillis = now, lastBackupError = error.message ?: "自动备份失败"),
+                    settings.copy(lastBackupAtMillis = retryBase, lastBackupError = error.message ?: "自动备份失败"),
                 )
             }
     }
@@ -153,8 +174,9 @@ internal object WebDavBackupManager {
         val manager = context.getSystemService(android.net.ConnectivityManager::class.java) ?: return true
         val network = manager.activeNetwork ?: return false
         val caps = manager.getNetworkCapabilities(network) ?: return false
-        return caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-            caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        // 只看 INTERNET：需登录的公共 Wi-Fi 与部分企业网没有 VALIDATED 标记，
+        // 却能正常访问自建 WebDAV，用 VALIDATED 会误判成「当前无网络」而跳过备份。
+        return caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 }
 

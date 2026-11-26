@@ -36,7 +36,10 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
+          # fetch-depth: 0 只取历史，不会拉 refs/tags/*；少了 fetch-tags 时
+          # 下面 rev-parse refs/tags/... 恒失败，tag 检查会形同虚设。
           fetch-depth: 0
+          fetch-tags: true
 
       - name: 读取 versionName 并检查 tag
         id: check
@@ -153,9 +156,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           APK_PATH: ${{ steps.apk.outputs.release_path }}
           VERSION_NAME: ${{ needs.prepare.outputs.version_name }}
-        run: >-
-          gh release create "v${VERSION_NAME}" "$APK_PATH"
-          --repo "$GITHUB_REPOSITORY"
-          --target "$GITHUB_SHA"
-          --title "v${VERSION_NAME}"
-          --generate-notes
+        run: |
+          set -euo pipefail
+          # 与 android-release.yml 同为发布入口：另一条路径可能刚建过同名 Release，
+          # 先确认再创建，避免 400 already_exists 让整轮构建白跑。
+          if gh release view "v${VERSION_NAME}" --repo "$GITHUB_REPOSITORY" --json tagName; then
+            echo "同名 Release 已存在，跳过创建。"
+            exit 0
+          fi
+          gh release create "v${VERSION_NAME}" "$APK_PATH" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "v${VERSION_NAME}" \
+            --generate-notes

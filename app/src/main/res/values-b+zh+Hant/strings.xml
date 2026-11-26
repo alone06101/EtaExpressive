@@ -2296,6 +2296,7 @@
   <string name="conversation_duplicate_done">已建立會話副本</string>
   <string name="conversation_duplicate_failed">建立副本失敗</string>
   <string name="conversation_duplicate_busy">正在建立副本，請稍候</string>
+  <string name="webdav_password_encrypt_failed">無法加密密碼（金鑰庫不可用），密碼未儲存</string>
   <string name="provider_system_prompt_title">系統提示詞</string>
   <string name="provider_system_prompt_label">系統提示詞</string>
   <string name="provider_system_prompt_summary">留空則不注入。助手的「跟隨服務商」開啟且此處有內容時，執行時優先使用它，助手人格與能力塊追加在其後。</string>

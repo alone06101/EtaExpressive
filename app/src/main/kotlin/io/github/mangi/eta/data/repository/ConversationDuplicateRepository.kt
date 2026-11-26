@@ -36,7 +36,8 @@ internal object ConversationDuplicateRepository {
         )
         val newId = EtaConversationAnalysisRepository.import(app, document)
 
-        val baseTitle = source.title.ifBlank { "未命名" }
+        // 对副本再克隆时去掉已有的副本后缀，避免「X（副本）（副本）」。
+        val baseTitle = source.title.removeSuffix(titleSuffix).trim().ifBlank { "未命名" }
         dao.updateCloneMetadata(
             id = newId,
             title = baseTitle + titleSuffix,
