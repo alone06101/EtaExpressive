@@ -32,6 +32,8 @@ import io.github.mangi.eta.data.model.WebDavSettings
 import io.github.mangi.eta.data.repository.WebDavAutoBackup
 import io.github.mangi.eta.data.repository.WebDavBackupEntry
 import io.github.mangi.eta.data.repository.WebDavBackupManager
+import io.github.mangi.eta.data.repository.EtaBackupExportOptions
+import io.github.mangi.eta.data.repository.withExportOptions
 import io.github.mangi.eta.data.repository.WebDavSecretCipher
 import io.github.mangi.eta.ui.adaptive.EtaGroupHorizontalPadding
 import io.github.mangi.eta.ui.adaptive.EtaSegmentedColumn
@@ -49,7 +51,10 @@ import kotlinx.coroutines.withContext
  * 同一个 lastBackupAtMillis，防抖窗口才不会各算各的。
  */
 @Composable
-internal fun WebDavBackupSection(modifier: Modifier = Modifier) {
+internal fun WebDavBackupSection(
+    exportOptions: EtaBackupExportOptions = EtaBackupExportOptions(),
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var settings by remember { mutableStateOf(WebDavSettings()) }
@@ -165,11 +170,11 @@ internal fun WebDavBackupSection(modifier: Modifier = Modifier) {
                 checked = settings.autoBackupEnabled,
                 enabled = !busy,
                 onCheckedChange = { enabled ->
-                    val next = draft().copy(autoBackupEnabled = enabled)
+                    val next = draft().withExportOptions(exportOptions).copy(autoBackupEnabled = enabled)
                     persist(next)
                     // 开启时立即跑一次（用户明确要求），关掉则只取消闹钟。
                     if (enabled) run(context.getString(R.string.webdav_upload_label)) {
-                        WebDavBackupManager.uploadManually(context, next)
+                        WebDavBackupManager.uploadManually(context, next, exportOptions)
                     }
                 },
             )
@@ -210,10 +215,11 @@ internal fun WebDavBackupSection(modifier: Modifier = Modifier) {
                 loading = busy,
                 enabled = !busy,
                 onClick = {
-                    val next = draft()
+                    // 勾选固化进设置：本次与后续自动备份都按同一套内容打包。
+                    val next = draft().withExportOptions(exportOptions)
                     persist(next, restartAlarm = false)
                     run(context.getString(R.string.webdav_upload_label)) {
-                        WebDavBackupManager.uploadManually(context, next)
+                        WebDavBackupManager.uploadManually(context, next, exportOptions)
                         val refreshed = SettingsDataStore.webDavSettings()
                         withContext(Dispatchers.Main) { settings = refreshed }
                     }

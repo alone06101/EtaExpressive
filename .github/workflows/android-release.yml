@@ -144,8 +144,8 @@ jobs:
           retention-days: 14
 
   # 构建 job 持有签名 Secrets，写 Release 的权限单独放在这里，且只在发版标签上运行
-  draft-release:
-    name: 创建 Release 草稿
+  publish-release:
+    name: 创建 Release
     needs: [verify, build-apks]
     if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
@@ -163,15 +163,15 @@ jobs:
           name: app-release.apk
           path: ${{ runner.temp }}/release
 
-      # 只建草稿：草稿不会出现在 releases/latest，App 内更新检查要等维护者手动发布后才可见
-      - name: 创建 Release 草稿
+      # 直接发布：README 的下载按钮指向 releases/latest，草稿不进 latest，
+      # 用户点进去只会看到 tag 页面的源码包而不是 APK。
+      - name: 创建 Release
         env:
           GH_TOKEN: ${{ github.token }}
           APK_PATH: ${{ runner.temp }}/release/app-release.apk
         run: >-
           gh release create "$GITHUB_REF_NAME" "$APK_PATH"
           --repo "$GITHUB_REPOSITORY"
-          --draft
           --verify-tag
           --title "$GITHUB_REF_NAME"
           --generate-notes

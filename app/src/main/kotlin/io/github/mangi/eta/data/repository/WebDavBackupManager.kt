@@ -34,7 +34,7 @@ internal object WebDavBackupManager {
     suspend fun upload(
         context: Context,
         settings: WebDavSettings,
-        options: EtaBackupExportOptions = EtaBackupExportOptions(),
+        options: EtaBackupExportOptions = settings.exportOptions(),
     ): String = withContext(Dispatchers.IO) {
         val app = context.applicationContext
         val password = WebDavSecretCipher.decrypt(settings.passwordEncrypted)
@@ -126,9 +126,17 @@ internal object WebDavBackupManager {
             }
     }
 
-    /** 手动备份：成功后顺延自动备份的防抖窗口。 */
-    suspend fun uploadManually(context: Context, settings: WebDavSettings): String {
-        val fileName = upload(context, settings)
+    /**
+     * 手动备份：成功后顺延自动备份的防抖窗口。
+     *
+     * [options] 由调用方传入页面上的勾选；不传则用设置里记住的那一套。
+     */
+    suspend fun uploadManually(
+        context: Context,
+        settings: WebDavSettings,
+        options: EtaBackupExportOptions = settings.exportOptions(),
+    ): String {
+        val fileName = upload(context, settings, options)
         SettingsDataStore.setWebDavSettings(
             settings.copy(lastBackupAtMillis = System.currentTimeMillis(), lastBackupError = ""),
         )
@@ -149,3 +157,29 @@ internal object WebDavBackupManager {
             caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 }
+
+/**
+ * 把界面上的勾选固化进设置，供本次与后续自动备份复用。
+ *
+ * 云端若固定用默认选项，同一份数据会比本地导出小一大截（Linux 环境、模型、
+ * 浏览器设置都不进包），用户看到的就是「两边大小明显不一样」。
+ */
+internal fun WebDavSettings.withExportOptions(options: EtaBackupExportOptions): WebDavSettings = copy(
+    includeAppData = options.includeAppData,
+    includeLinuxEnvironment = options.includeLinuxEnvironment,
+    includeEmbeddings = options.includeEmbeddings,
+    includeModels = options.includeModels,
+    includeBrowserSettings = options.includeBrowserSettings,
+    // 密钥只存在于应用数据里，没勾应用数据就必然不带。
+    includeApiKeys = options.includeApiKeys && options.includeAppData,
+)
+
+/** 还原成导出选项；手动与自动备份都走这一个出口。 */
+internal fun WebDavSettings.exportOptions(): EtaBackupExportOptions = EtaBackupExportOptions(
+    includeAppData = includeAppData,
+    includeApiKeys = includeApiKeys && includeAppData,
+    includeBrowserSettings = includeBrowserSettings,
+    includeLinuxEnvironment = includeLinuxEnvironment,
+    includeEmbeddings = includeEmbeddings,
+    includeModels = includeModels,
+)

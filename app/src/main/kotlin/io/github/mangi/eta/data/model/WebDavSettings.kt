@@ -22,6 +22,15 @@ data class WebDavSettings(
     val lastBackupAtMillis: Long = 0L,
     /** 上次备份结果：成功为空串，失败为简短原因，仅用于界面提示。 */
     val lastBackupError: String = "",
+    // ---- 备份内容选项 ----
+    // 云端与本地必须用同一套选项，否则同一份数据两边体积会差出几十上百兆。
+    // 自动备份没有界面上下文，因此把用户最后一次的选择记在这里复用。
+    val includeAppData: Boolean = true,
+    val includeLinuxEnvironment: Boolean = false,
+    val includeEmbeddings: Boolean = true,
+    val includeModels: Boolean = false,
+    val includeBrowserSettings: Boolean = false,
+    val includeApiKeys: Boolean = false,
 ) {
     val configured: Boolean
         get() = serverUrl.isNotBlank() && username.isNotBlank() && passwordEncrypted.isNotBlank()

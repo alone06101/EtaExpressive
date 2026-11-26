@@ -358,7 +358,18 @@ internal fun DataBackupScreen(
         }
         // WebDAV 云端备份：本地导出/导入之后，同一套备份包的云端通道。
         item(key = "webdav") {
-            WebDavBackupSection()
+            // 把页面上的勾选一并传下去：云端若固定用默认选项，同一份数据会比本地导出
+            // 小一大截（Linux 环境、模型、浏览器设置都不进包）。
+            WebDavBackupSection(
+                exportOptions = EtaBackupExportOptions(
+                    includeAppData = includeAppData,
+                    includeApiKeys = includeApiKeys && includeAppData,
+                    includeBrowserSettings = includeBrowserSettings,
+                    includeLinuxEnvironment = includeLinuxEnvironment,
+                    includeEmbeddings = includeEmbeddings,
+                    includeModels = includeModels,
+                ),
+            )
         }
         item(key = "transfer") {
             EtaSegmentedColumn(
