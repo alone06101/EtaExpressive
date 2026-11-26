@@ -35,7 +35,18 @@ class EtaConversationAnalysisTest {
     @Before
     fun setUp() {
         EtaDatabase.closeForTests()
-        context.deleteDatabase("eta.db")
+        // 同一 Robolectric worker 里别的测试类的连接不归单例管，可能仍持有 eta.db：
+        // 单次 deleteDatabase 有时删不掉，残留库会让 seed 写到旧数据上，
+        // 最后在「run id 被重映射」那条断言处以误导的方式失败。这里重试并给出明确诊断。
+        var attempt = 0
+        while (attempt < 10 && context.getDatabasePath("eta.db").exists()) {
+            context.deleteDatabase("eta.db")
+            attempt++
+            if (context.getDatabasePath("eta.db").exists()) Thread.sleep(20L)
+        }
+        check(!context.getDatabasePath("eta.db").exists()) {
+            "eta.db 未能清除（尝试 $attempt 次）：仍有其它测试类的连接持有它"
+        }
     }
 
     private fun message(
