@@ -28,7 +28,7 @@ import org.robolectric.annotation.Config
 class EtaDatabaseIdentityRecoveryTest {
     /** 同 [DispatchSchemaDriftMigrationTest]：固定 eta.db 与跨类连接导致偶发，见规则注释。 */
     @get:Rule
-    val databaseRetry = DatabaseTestRetryRule()
+    private val databaseRetry = DatabaseTestRetryRule()
 
     @After
     fun tearDown() {

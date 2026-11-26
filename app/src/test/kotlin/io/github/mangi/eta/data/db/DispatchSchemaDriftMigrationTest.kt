@@ -40,7 +40,7 @@ class DispatchSchemaDriftMigrationTest {
      * 持续失败仍然会红。
      */
     @get:Rule
-    val databaseRetry = DatabaseTestRetryRule()
+    private val databaseRetry = DatabaseTestRetryRule()
 
     @Test
     fun staleVersion39FromDeviceUpgradesTo40AndKeepsData() {
