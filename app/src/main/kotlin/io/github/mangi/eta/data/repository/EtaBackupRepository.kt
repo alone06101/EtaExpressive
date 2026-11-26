@@ -53,6 +53,7 @@ import io.github.mangi.eta.data.model.AssistantPrompt
 import io.github.mangi.eta.data.model.CustomBody
 import io.github.mangi.eta.data.model.CustomHeader
 import io.github.mangi.eta.data.model.ProviderAuthModes
+import io.github.mangi.eta.data.model.WebDavSettings
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
@@ -186,6 +187,14 @@ internal data class EtaBackupDocument(
      * 受 [apiKeysIncluded] 开关取舍。空表 = 旧备份没带，导入时保留本机选型。
      */
     val modelSelections: Map<String, Map<String, String>> = emptyMap(),
+    /**
+     * WebDAV 云端备份配置。null 表示旧备份没有该段，导入时不动本机配置。
+     *
+     * 密码与 provider apiKey 同策略：passwordEncrypted 在本机是 Keystore 密文，
+     * 勾了「包含 API Key」时导出成明文（换机后可重新加密入库），否则清空。
+     * 换机后密码为空则只保留地址与账号，用户补填一次即可。
+     */
+    val webDavSettings: WebDavSettings? = null,
 ) {
     companion object {
         const val FORMAT = "eta-backup"
@@ -1093,6 +1102,8 @@ internal object EtaBackupRepository {
                 appDataIncluded = false,
                 // 这一支不带提供商与语音配置，包里本来就没有密钥。
                 apiKeysIncluded = false,
+                // 云端备份配置是纯设置，与「应用数据」取舍无关；密码按 apiKeys 策略留空。
+                webDavSettings = SettingsDataStore.webDavSettings().let { it.copy(passwordEncrypted = "") },
             )
         }
         val database = EtaDatabase.get(context)
@@ -1188,6 +1199,16 @@ internal object EtaBackupRepository {
             },
             // 口令与 provider key 同策略：不勾「包含 API Key」时写 null（而不是空串），
             // 导入端据此区分「备份没带凭据」与「这台服务器本来就不需要认证」。
+            webDavSettings = SettingsDataStore.webDavSettings().let { dav ->
+                // 密码在本机是 Keystore 密文，换机后解不开；勾了「包含 API Key」才导出明文。
+                dav.copy(
+                    passwordEncrypted = if (options.includeApiKeys) {
+                        WebDavSecretCipher.decrypt(dav.passwordEncrypted).orEmpty()
+                    } else {
+                        ""
+                    },
+                )
+            },
             remoteServers = SettingsDataStore.remoteServers().map { server ->
                 EtaBackupRemoteServer(
                     id = server.id,
@@ -1385,6 +1406,7 @@ internal object EtaBackupRepository {
                 subAgentStore.refreshAfterRestore()
             }
             document.remoteServers?.let { restoreRemoteServers(it, exact = exactPreferences) }
+            document.webDavSettings?.let { restoreWebDavSettings(it) }
             LinuxEnvironmentSettingsRepository.initialize(context)
             if (reconcile) {
                 ProviderRepository.ensureBuiltInsMerged()
@@ -1430,6 +1452,28 @@ internal object EtaBackupRepository {
             if (index >= 0) merged[index] = config else merged += config
         }
         SettingsDataStore.setRemoteServers(merged)
+    }
+
+    /**
+     * 写回 WebDAV 云端备份配置。
+     *
+     * 备份里的密码是明文（导出时按 apiKeys 策略解密），这里重新用 Keystore 加密入库；
+     * 密码为空表示导出时没勾「包含 API Key」，此时保留本机既有密文，不用空值覆盖——
+     * 与 remoteServers 的 authToken 语义一致。
+     */
+    private suspend fun restoreWebDavSettings(restored: WebDavSettings) {
+        val current = SettingsDataStore.webDavSettings()
+        val encrypted = if (restored.passwordEncrypted.isBlank()) {
+            current.passwordEncrypted
+        } else {
+            // 已经是 enc1. 前缀的（同机恢复）直接留用，否则重新加密。
+            if (WebDavSecretCipher.isEncrypted(restored.passwordEncrypted)) {
+                restored.passwordEncrypted
+            } else {
+                WebDavSecretCipher.encrypt(restored.passwordEncrypted) ?: current.passwordEncrypted
+            }
+        }
+        SettingsDataStore.setWebDavSettings(restored.copy(passwordEncrypted = encrypted))
     }
 
     private suspend fun rewriteRestoredPaths(context: Context, document: EtaBackupDocument) {
