@@ -12,6 +12,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import org.junit.Rule
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
@@ -20,6 +21,15 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class EtaConversationAnalysisTest {
+    /**
+     * 与迁移测试同一类问题：@Before 直接删固定库名 eta.db，而同一 Robolectric worker 里
+     * 别的测试类的连接不归单例管，删文件后仍可能把旧库写回，导致种子数据与实际读到的
+     * 库不一致（CI 上表现为 importRestoresTheConversationAsANewChat 偶发断言失败）。
+     * 用一个确定性重试挡掉偶发；持续失败仍然变红。
+     */
+    @get:Rule
+    private val databaseRetry = io.github.mangi.eta.data.db.DatabaseTestRetryRule()
+
     private val context = RuntimeEnvironment.getApplication()
 
     @Before
