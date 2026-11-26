@@ -24,6 +24,7 @@
 - **WebDAV 云端备份**：备份页新增云端通道。备份包上传到你自己的 WebDAV 服务器（Basic Auth），支持每天或每周自动备份，也可从云端逐条恢复。密码用 AndroidKeyStore 的 AES-GCM 硬件加密存储，密钥不出 TEE；界面上可临时切换明文视图核对，但落盘始终是密文。云端恢复与本地导入共用同一套校验链（format、schema 版本、体积上限），非本应用生成的包会被直接拒绝；上传与下载都走 cacheDir 临时文件并在完成后删除。云端备份与本地导出共用同一套内容选项（Linux 环境、模型等按页面勾选打包），WebDAV 配置本身也随备份包迁移。
 - **会话副本**：侧栏会话长按菜单可「创建会话副本」——克隆出包含全部消息、附件与模型历史的独立会话，标题加「副本」后缀，保留原分类与模型绑定。实现复用「导出会话分析 → 导入为新会话」这条链路，因此消息 id、run id 重映射与附件引用都由已验证的代码处理；克隆时一并复制模型历史文件，副本继续对话不会丢上下文。
 - **自动化流程**：`auto-release.yml` 在 main 推送后按 `versionName` 自动发版——仅当版本号变化且对应 tag 不存在时构建并发布，版本号没变则整轮跳过；`sync-upstream.yml` 每天 UTC 02:30 比对上游，无新提交直接结束（不建分支、不开 PR），有更新则建分支合并并开 PR，冲突则中止合并、开 issue 交人工处理。
+- **测试稳定性**：`DispatchSchemaDriftMigrationTest` 与 `EtaDatabaseIdentityRecoveryTest` 验证的是「生产入口打开固定库名 `eta.db`」的行为，而 Robolectric 让同一个 JVM 内的所有测试类共享应用私有目录；别的测试类留下的 SQLite 连接不归单例管，清库后仍可能把旧版本 checkpoint 写回同一路径，CI 上表现为不同用例轮流随机失败。新增 `DatabaseTestRetryRule` 做确定性重试（最多 3 次、失败后退避并关闭单例），只有持续失败才会真正变红。
 - **构建链路修复**：修正 `build-debug` 工作流下载的 Compose AAR 版本（与 `ComposeSemanticsAarTransform.VERSION`、`libs.versions.toml` 对齐到 `1.13.0-alpha01`）、`buildSrc` 版本断言、以及 traversal 补丁测试的过期期望；签名校验改为校验本仓库自己的证书指纹。
 
 > 提示词行为：服务商提示词留空时，行为与上游完全一致。
