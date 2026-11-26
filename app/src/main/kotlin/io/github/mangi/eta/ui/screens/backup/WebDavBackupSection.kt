@@ -274,7 +274,7 @@ internal fun WebDavBackupSection(
                     loading = busy,
                     enabled = !busy,
                     onClick = {
-                        val next = draft() ?: return@onClick
+                        val next = draft() ?: return@BackupActionRow
                         run(context.getString(R.string.webdav_restore_label)) {
                             WebDavBackupManager.restore(context, next, entry.fileName)
                         }

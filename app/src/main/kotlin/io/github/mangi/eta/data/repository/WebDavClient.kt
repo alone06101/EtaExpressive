@@ -134,7 +134,7 @@ internal class WebDavClient(
          * 极简 PROPFIND 解析：只取 href 与 getlastmodified。
          *
          * 不引入 XML 解析器：这里只需要「有哪些 zip」。解析不出时返回空表，
-         * 由调用方提示「云端没有备份」。日期按出现顺序与 href 对齐，数量不足时留空。
+         * 由调用方提示「云端没有备份」。每个条目只在自己的 response 块内取时间。
          */
         fun parseEntries(xml: String): List<WebDavBackupEntry> {
             if (xml.isBlank()) return emptyList()
@@ -149,7 +149,7 @@ internal class WebDavClient(
                     fileName = java.net.URLDecoder.decode(name, "UTF-8"),
                     lastModified = LASTMODIFIED.find(body)?.groupValues?.getOrNull(1)?.trim().orEmpty(),
                 )
-            }.distinctBy { it.fileName }.sortedByDescending { it.fileName }
+            }.distinctBy { it.fileName }.sortedByDescending { it.fileName }.toList()
         }
 
         private val RESPONSE = Regex("<(?:d:|D:)?response>(.*?)</(?:d:|D:)?response>", RegexOption.DOT_MATCHES_ALL)
