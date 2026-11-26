@@ -14,18 +14,6 @@
 ## Changes in This Fork
 Built on top of the [Eta upstream](https://github.com/Mangi-11/Eta), this fork primarily redesigns the interface appearance around the **Material Design 3 Expressive (M3E)** visual style and adds a batch of functional improvements. The following lists the core differences compared to the upstream (see commit history for full details):
 
-### Appearance and UI
-- **Material Design 3 Expressive (M3E) Adaptation**: Chat bubbles, cards, buttons, and transition animations have been redesigned referencing the example specifications of [Material Design 3 Expressive](https://m3.material.io), making the overall visual style closer to Google's latest Material expressive design.
-- **Detail Polish**: Details are continuously being refined. You are welcome to try it out. If you have any suggestions, please feel free to submit an issue or pull request.
-
-### Functional Improvements
-- **MCP Self-Configuration**: Added the `eta_configure_mcp` tool, allowing the Agent to configure MCP servers (add, remove, update, query, refresh discovery, enable/disable tools) directly through conversation; configurations take effect from the next turn of conversation.
-- **Local Skill Installation**: Added the `skills_install_local` tool, supporting direct installation of Skills from local phone directories (e.g., download folders, extracted ZIPs, Linux workspace paths); it automatically validates whether the directory contains only a single Skill and supports overwriting existing versions.
-- **CI and Test Stability**: Fixed timing-sensitive assertions and lint errors in multiple unit tests, ensuring the `verify` job passes stably in GitHub Actions.
-- **Release Workflow**: Aligned with the actual release process, adding automatic generation of bilingual (Chinese/English) changelogs and Release Assets uploads.
-
-For a complete list of new features, please refer to this repository's [Releases](https://github.com/alone06101/EtaExpressive/releases) and [commit history](https://github.com/alone06101/EtaExpressive/commits/main).
-
 ### Changes Relative to Sam-Fic/EtaExpressive
 
 This repository traces back through [Sam-Fic/EtaExpressive](https://github.com/Sam-Fic/EtaExpressive) to [Mangi-11/Eta](https://github.com/Mangi-11/Eta). On top of the inherited M3E interface and existing improvements, this fork adds:
@@ -37,6 +25,18 @@ This repository traces back through [Sam-Fic/EtaExpressive](https://github.com/S
 - **Build chain fixes**: Corrected the Compose AAR version downloaded by the `build-debug` workflow (aligned to `1.13.0-alpha01` with `ComposeSemanticsAarTransform.VERSION` and `libs.versions.toml`), stale version assertions in `buildSrc`, and an outdated expectation in the traversal patch test; the signature check now verifies this repository's own certificate.
 
 > Prompt behavior is identical to upstream whenever the provider system prompt is left blank.
+
+### Appearance and UI
+- **Material Design 3 Expressive (M3E) Adaptation**: Chat bubbles, cards, buttons, and transition animations have been redesigned referencing the example specifications of [Material Design 3 Expressive](https://m3.material.io), making the overall visual style closer to Google's latest Material expressive design.
+- **Detail Polish**: Details are continuously being refined. You are welcome to try it out. If you have any suggestions, please feel free to submit an issue or pull request.
+
+### Functional Improvements
+- **MCP Self-Configuration**: Added the `eta_configure_mcp` tool, allowing the Agent to configure MCP servers (add, remove, update, query, refresh discovery, enable/disable tools) directly through conversation; configurations take effect from the next turn of conversation.
+- **Local Skill Installation**: Added the `skills_install_local` tool, supporting direct installation of Skills from local phone directories (e.g., download folders, extracted ZIPs, Linux workspace paths); it automatically validates whether the directory contains only a single Skill and supports overwriting existing versions.
+- **CI and Test Stability**: Fixed timing-sensitive assertions and lint errors in multiple unit tests, ensuring the `verify` job passes stably in GitHub Actions.
+- **Release Workflow**: Aligned with the actual release process, adding automatic generation of bilingual (Chinese/English) changelogs and Release Assets uploads.
+
+For a complete list of new features, please refer to this repository's [Releases](https://github.com/alone06101/EtaExpressive/releases) and [commit history](https://github.com/alone06101/EtaExpressive/commits/main).
 
 ## About This Project
 

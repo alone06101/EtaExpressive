@@ -14,18 +14,6 @@
 ## 本 Fork 的变化
 本项目在 [Eta 上游](https://github.com/Mangi-11/Eta) 的基础上，主要围绕 **Material Design 3 Expressive（M3E）** 的视觉风格重新设计了界面外观，并补充了一批功能改进。以下列出与上游相比的核心差异（完整改动见提交历史）：
 
-### 外观与 UI
-- **Material Design 3 Expressive（M3E）适配**：对话气泡、卡片、按钮与过渡动效均参考 [Material Design 3 Expressive](https://m3.material.io) 的示例规范重新设计，整体视觉更贴近 Google 最新的 Material 表达风格。
-- **细节打磨**：界面细节仍在持续优化中，欢迎体验。如有建议，请随时提交 Issue 或 Pull Request。
-
-### 功能改进
-- **MCP 自主配置**：新增 `eta_configure_mcp` 工具，允许 Agent 通过对话自行配置 MCP 服务器（增、删、改、查、刷新发现、启用/停用工具），配置将于下一轮对话生效。
-- **本地 Skill 安装**：新增 `skills_install_local` 工具，支持直接从手机本地目录（如下载文件夹、解压后的 ZIP、Linux 工作区路径）安装 Skill；自动校验目录内是否仅含单一 Skill，并支持覆盖已有版本。
-- **CI 与测试稳定性**：修复了多组单元测试中的时序敏感断言与 Lint 错误，确保 `verify` 作业在 GitHub Actions 中稳定通过。
-- **Release 工作流**：跟进实际发版流程，补充了中英双语更新日志的自动生成与 Release Assets 上传功能。
-
-如需完整的新增功能列表，请参阅本仓库的 [Releases](https://github.com/alone06101/EtaExpressive/releases) 与 [提交历史](https://github.com/alone06101/EtaExpressive/commits/main)。
-
 ### 相对 Sam-Fic/EtaExpressive 的改动
 
 本仓库是 [alone06101/EtaExpressive](https://github.com/alone06101/EtaExpressive) 本身，向上溯源为 [Sam-Fic/EtaExpressive](https://github.com/Sam-Fic/EtaExpressive) → [Mangi-11/Eta](https://github.com/Mangi-11/Eta)。在继承 M3E 界面与既有改进的基础上，本仓库额外包含以下改动：
@@ -37,6 +25,18 @@
 - **构建链路修复**：修正 `build-debug` 工作流下载的 Compose AAR 版本（与 `ComposeSemanticsAarTransform.VERSION`、`libs.versions.toml` 对齐到 `1.13.0-alpha01`）、`buildSrc` 版本断言、以及 traversal 补丁测试的过期期望；签名校验改为校验本仓库自己的证书指纹。
 
 > 提示词行为：服务商提示词留空时，行为与上游完全一致。
+
+### 外观与 UI
+- **Material Design 3 Expressive（M3E）适配**：对话气泡、卡片、按钮与过渡动效均参考 [Material Design 3 Expressive](https://m3.material.io) 的示例规范重新设计，整体视觉更贴近 Google 最新的 Material 表达风格。
+- **细节打磨**：界面细节仍在持续优化中，欢迎体验。如有建议，请随时提交 Issue 或 Pull Request。
+
+### 功能改进
+- **MCP 自主配置**：新增 `eta_configure_mcp` 工具，允许 Agent 通过对话自行配置 MCP 服务器（增、删、改、查、刷新发现、启用/停用工具），配置将于下一轮对话生效。
+- **本地 Skill 安装**：新增 `skills_install_local` 工具，支持直接从手机本地目录（如下载文件夹、解压后的 ZIP、Linux 工作区路径）安装 Skill；自动校验目录内是否仅含单一 Skill，并支持覆盖已有版本。
+- **CI 与测试稳定性**：修复了多组单元测试中的时序敏感断言与 Lint 错误，确保 `verify` 作业在 GitHub Actions 中稳定通过。
+- **Release 工作流**：跟进实际发版流程，补充了中英双语更新日志的自动生成与 Release Assets 上传功能。
+
+如需完整的新增功能列表，请参阅本仓库的 [Releases](https://github.com/alone06101/EtaExpressive/releases) 与 [提交历史](https://github.com/alone06101/EtaExpressive/commits/main)。
 
 ## 关于本项目
 
