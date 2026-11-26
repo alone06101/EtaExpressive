@@ -98,6 +98,7 @@ import io.github.mangi.eta.data.model.withModels
 import io.github.mangi.eta.data.repository.AgentMemoryRepository
 import io.github.mangi.eta.data.repository.EtaBackupExportOptions
 import io.github.mangi.eta.data.repository.AgentConversationHistoryFiles
+import io.github.mangi.eta.data.repository.CapabilityAssistRouter
 import io.github.mangi.eta.data.repository.ConversationDuplicateRepository
 import io.github.mangi.eta.data.repository.EtaBackupRepository
 import io.github.mangi.eta.data.repository.EtaBackupSummary
@@ -5383,7 +5384,15 @@ internal class AgentAppState(
                 personalTools = agentBooleanForUi(Prefs.Keys.AGENT_PERSONAL_TOOLS),
                 thinkingEnabled = permittedReasoningEffort.enablesReasoning,
                 reasoningEffort = permittedReasoningEffort,
-            )
+            ).let { prepared ->
+                // 首选模型缺少本轮需要的能力（图片要视觉、视频要视频输入）时，这一轮临时交给
+                // 能处理的模型；config 随请求体下发，下一轮仍按用户选定模型重新构建，无需恢复。
+                CapabilityAssistRouter.route(
+                    prepared,
+                    needsImage = images.any { !it.isVideo },
+                    needsVideo = images.any { it.isVideo },
+                )
+            }
             // The display estimate duplicates prompt/tool assembly the runtime also performs.
             // Run it beside write-ahead persistence instead of after it; the run still waits for
             // both so compression and the context ring see this turn's overhead.

@@ -85,6 +85,8 @@ internal object SettingsDataStore {
      */
     /** WebDAV 云端备份配置（JSON，密码字段存密文）。 */
     private val WEBDAV_SETTINGS = stringPreferencesKey("webdav_settings_v1")
+
+    private val CAPABILITY_ASSIST = stringPreferencesKey("capability_assist_v1")
     private val webDavJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     private val REMOTE_SERVERS = stringPreferencesKey("remote_servers_v1")
     private val remoteServersJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
@@ -148,6 +150,27 @@ internal object SettingsDataStore {
                 } ?: io.github.mangi.eta.data.model.WebDavSettings()
             }
             .distinctUntilChanged()
+    }
+
+    fun capabilityAssistFlow(): Flow<io.github.mangi.eta.data.model.CapabilityAssistSettings> {
+        ensureInitialized()
+        return dataStore.data
+            .map { prefs ->
+                prefs[CAPABILITY_ASSIST]?.let { raw ->
+                    runCatching {
+                        webDavJson.decodeFromString<io.github.mangi.eta.data.model.CapabilityAssistSettings>(raw)
+                    }.getOrNull()
+                } ?: io.github.mangi.eta.data.model.CapabilityAssistSettings()
+            }
+            .distinctUntilChanged()
+    }
+
+    suspend fun capabilityAssist(): io.github.mangi.eta.data.model.CapabilityAssistSettings =
+        capabilityAssistFlow().first()
+
+    suspend fun setCapabilityAssist(settings: io.github.mangi.eta.data.model.CapabilityAssistSettings) {
+        ensureInitialized()
+        dataStore.edit { prefs -> prefs[CAPABILITY_ASSIST] = webDavJson.encodeToString(settings) }
     }
 
     suspend fun webDavSettings(): io.github.mangi.eta.data.model.WebDavSettings = webDavSettingsFlow().first()
