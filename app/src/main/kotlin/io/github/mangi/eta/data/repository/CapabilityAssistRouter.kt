@@ -91,8 +91,80 @@ internal object CapabilityAssistRouter {
         config
     }
 
+    /**
+     * 可参与协作的能力维度。
+     *
+     * 加新维度时只在这里加一个枚举项与 [matches] 的一行分支，
+     * 挑选逻辑（顺序、跳过停用、跳过无凭据）不用重复写。
+     */
+    enum class Capability {
+        /** 需要模型看得懂图片 */
+        VISION_INPUT,
+
+        /** 需要模型看得懂视频 */
+        VIDEO_INPUT,
+
+        /** 需要模型生成图片 */
+        IMAGE_OUTPUT,
+
+        /** 需要模型生成视频 */
+        VIDEO_OUTPUT,
+
+        /** 需要模型能调用工具 */
+        TOOL_CALL,
+    }
+
+    /** 单个模型是否满足某个能力维度。 */
+    private fun matches(model: Model, capability: Capability): Boolean = when (capability) {
+        Capability.VISION_INPUT -> model.supportsVision
+        Capability.VIDEO_INPUT -> model.supportsVideo
+        // 图像会排除同时被判成视频模型的条目：那类模型的调用形态是视频任务。
+        Capability.IMAGE_OUTPUT -> model.supportsImageGeneration && !model.supportsVideoGeneration
+        Capability.VIDEO_OUTPUT -> model.supportsVideoGeneration
+        // 只有明确标注「不支持工具」才算缺；null 表示未知，按支持处理，避免误切。
+        Capability.TOOL_CALL -> model.toolCall != false
+    }
+
     /** 本轮需要的媒体输出类型。 */
     enum class MediaOutputKind { IMAGE, VIDEO }
+
+    /**
+     * 统一挑选：按协助顺序找第一个满足 [capability] 的启用模型。
+     *
+     * 这是各维度唯一的挑选实现；媒体输出、工具能力都走这里，
+     * 差别只在 [matches] 的判定。
+     */
+    suspend fun pickFor(
+        capability: Capability,
+        excludedProviderId: String?,
+    ): Pair<ProviderSetting, Model>? = withContext(Dispatchers.IO) {
+        val settings = runCatching { SettingsDataStore.capabilityAssist() }.getOrNull() ?: return@withContext null
+        if (!settings.enabled) return@withContext null
+        val candidates = settings.providerOrder.ifEmpty { enabledProviderIds() }
+        for (providerId in candidates) {
+            if (providerId == excludedProviderId) continue
+            val provider = runCatching { ProviderRepository.providerById(providerId) }
+                .getOrNull()?.takeIf { it.isEnabled } ?: continue
+            val model = provider.models
+                .filter { it.isEnabled && matches(it, capability) }
+                .sortedBy { it.sortOrder }
+                .firstOrNull() ?: continue
+            AndroidAgentLogger.debug {
+                "capability assist (${capability.name.lowercase()}): ${provider.id}/${model.modelId}"
+            }
+            return@withContext provider to model
+        }
+        null
+    }
+
+    /** 同步入口：给非 suspend 的发送路径用（低频，普通消息不会走到）。 */
+    fun pickForBlocking(
+        capability: Capability,
+        excludedProviderId: String?,
+    ): Pair<ProviderSetting, Model>? =
+        runCatching {
+            kotlinx.coroutines.runBlocking { pickFor(capability, excludedProviderId) }
+        }.getOrNull()
 
     /**
      * 为「本轮要出图/出视频」挑一个能生成的模型。
@@ -107,30 +179,13 @@ internal object CapabilityAssistRouter {
     suspend fun pickMediaModel(
         kind: MediaOutputKind,
         excludedProviderId: String?,
-    ): Pair<ProviderSetting, Model>? = withContext(Dispatchers.IO) {
-        val settings = runCatching { SettingsDataStore.capabilityAssist() }.getOrNull() ?: return@withContext null
-        if (!settings.enabled) return@withContext null
-        val candidates = settings.providerOrder.ifEmpty { enabledProviderIds() }
-        for (providerId in candidates) {
-            if (providerId == excludedProviderId) continue
-            val provider = runCatching { ProviderRepository.providerById(providerId) }
-                .getOrNull()?.takeIf { it.isEnabled } ?: continue
-            val model = provider.models
-                .filter { it.isEnabled && matchesMediaOutput(it, kind) }
-                .sortedBy { it.sortOrder }
-                .firstOrNull() ?: continue
-            AndroidAgentLogger.debug {
-                "capability assist (${kind.name.lowercase()} output): ${provider.id}/${model.modelId}"
-            }
-            return@withContext provider to model
-        }
-        null
-    }
-
-    private fun matchesMediaOutput(model: Model, kind: MediaOutputKind): Boolean = when (kind) {
-        MediaOutputKind.IMAGE -> model.supportsImageGeneration && !model.supportsVideoGeneration
-        MediaOutputKind.VIDEO -> model.supportsVideoGeneration
-    }
+    ): Pair<ProviderSetting, Model>? = pickFor(
+        capability = when (kind) {
+            MediaOutputKind.IMAGE -> Capability.IMAGE_OUTPUT
+            MediaOutputKind.VIDEO -> Capability.VIDEO_OUTPUT
+        },
+        excludedProviderId = excludedProviderId,
+    )
 
     /**
      * 给非 suspend 的发送路径用的同步入口。

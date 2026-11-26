@@ -5038,6 +5038,14 @@ internal class AgentAppState(
     }
 
 
+    /** 用户是否开启了任一工具组；没有工具需求时不必为工具能力切换模型。 */
+    private fun anyToolGroupEnabled(): Boolean =
+        agentBooleanForUi(Prefs.Keys.AGENT_TERMINAL_TOOLS) ||
+            agentBooleanForUi(Prefs.Keys.AGENT_BROWSER_TOOLS) ||
+            agentBooleanForUi(Prefs.Keys.AGENT_SCREEN_TOOLS) ||
+            agentBooleanForUi(Prefs.Keys.AGENT_DEVICE_TOOLS) ||
+            agentBooleanForUi(Prefs.Keys.AGENT_PERSONAL_TOOLS)
+
     private fun rejectSendIfContextWindowExceeded(
         history: List<AgentModelClient.ConversationMessage>,
         prompt: String,
@@ -5320,8 +5328,21 @@ internal class AgentAppState(
                 )
             else -> null
         }
-        val effectiveProvider = mediaAssist?.first ?: runProvider
-        val effectiveModel = mediaAssist?.second ?: runModel
+        var assistProvider = mediaAssist?.first
+        var assistModel = mediaAssist?.second
+        if (assistModel == null && runModel.toolCall == false && anyToolGroupEnabled()) {
+            // 模型明确不支持工具、而用户开着工具组：这一轮会退化成纯聊天，
+            // 工具需求被静默忽略。挑一个支持工具的模型接这一轮。
+            // 只在 toolCall == false（明确标注）时判定；null 是未知，按支持处理以免误切。
+            val toolAssist = CapabilityAssistRouter.pickForBlocking(
+                CapabilityAssistRouter.Capability.TOOL_CALL,
+                excludedProviderId = runProvider.id,
+            )
+            assistProvider = toolAssist?.first
+            assistModel = toolAssist?.second
+        }
+        val effectiveProvider = assistProvider ?: runProvider
+        val effectiveModel = assistModel ?: runModel
         if (effectiveModel.supportsSpeechSynthesis) {
             Toast.makeText(appContext, appContext.getString(R.string.appst_tts_model_chat_unsupported), Toast.LENGTH_LONG).show()
             return
