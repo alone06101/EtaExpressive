@@ -1,0 +1,161 @@
+name: Auto Release
+
+# main 上有提交时自动发包。
+#
+# 为什么要这个：android-release.yml 只在推 v* tag 时发布，而日常开发都在 main 上，
+# 结果就是「代码更新了但没有新包可下」。这里在 main push 后读 app/build.gradle.kts
+# 的 versionName，若对应 tag 还不存在就构建并发布——版本号没变则整轮跳过，
+# 不会对同一个版本重复发包，也不会产生无意义的构建。
+#
+# 本 workflow 用 GITHUB_TOKEN 建 Release/tag；GitHub 规定这种操作不会再触发
+# 其他 workflow，因此不会与 android-release.yml 形成递归。
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 与 android-release.yml 共享同一并发组：发版串行，避免两个工作流同时抢同一个 tag
+concurrency:
+  group: release-pipeline
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: 解析版本号并判断是否需要发包
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      should_release: ${{ steps.check.outputs.should_release }}
+      version_name: ${{ steps.check.outputs.version_name }}
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+
+      - name: 读取 versionName 并检查 tag
+        id: check
+        run: |
+          set -euo pipefail
+          version_name="$(sed -n 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"\(.*\)".*/\1/p' \
+            app/build.gradle.kts | head -n 1)"
+          if [[ -z "$version_name" ]]; then
+            echo "::error::未能从 app/build.gradle.kts 解析 versionName。"
+            exit 1
+          fi
+          tag="v${version_name}"
+
+          # push 触发时只在 versionName 变化时发版：否则每次普通提交都会尝试发布同一个版本，
+          # 要么与已有 tag 冲突，要么白跑一轮 20 分钟的构建。
+          # 手动触发（workflow_dispatch）不受此限制，用于补发失败的发布。
+          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            if ! git diff HEAD~1 HEAD -- app/build.gradle.kts | grep -q versionName; then
+              echo "本次提交未改动 versionName（${version_name}），跳过。"
+              echo "should_release=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+          echo "version_name=${version_name}" >> "$GITHUB_OUTPUT"
+          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            echo "版本 ${version_name} 已有 tag ${tag}，跳过。"
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "版本 ${version_name} 尚未发版，准备构建 ${tag}。"
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-apks:
+    name: 构建并发布
+    needs: prepare
+    if: needs.prepare.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: 配置构建环境
+        uses: ./.github/actions/setup-build
+
+      - name: 还原发布证书
+        env:
+          ETA_RELEASE_KEYSTORE_BASE64: ${{ secrets.ETA_RELEASE_KEYSTORE_BASE64 }}
+          ETA_RELEASE_STORE_PASSWORD: ${{ secrets.ETA_RELEASE_STORE_PASSWORD }}
+          ETA_RELEASE_KEY_ALIAS: ${{ secrets.ETA_RELEASE_KEY_ALIAS }}
+          ETA_RELEASE_KEY_PASSWORD: ${{ secrets.ETA_RELEASE_KEY_PASSWORD }}
+        run: |
+          if [[ -z "$ETA_RELEASE_KEYSTORE_BASE64" ||
+                -z "$ETA_RELEASE_STORE_PASSWORD" ||
+                -z "$ETA_RELEASE_KEY_ALIAS" ||
+                -z "$ETA_RELEASE_KEY_PASSWORD" ]]; then
+            echo "::error::缺少 Release 签名 Secrets，请检查仓库的 Actions Secrets。"
+            exit 1
+          fi
+          printf '%s' "$ETA_RELEASE_KEYSTORE_BASE64" \
+            | base64 --decode \
+            > "$RUNNER_TEMP/eta-release.p12"
+
+      - name: 构建 Release APK
+        timeout-minutes: 30
+        env:
+          ETA_RELEASE_STORE_FILE: ${{ runner.temp }}/eta-release.p12
+          ETA_RELEASE_STORE_PASSWORD: ${{ secrets.ETA_RELEASE_STORE_PASSWORD }}
+          ETA_RELEASE_KEY_ALIAS: ${{ secrets.ETA_RELEASE_KEY_ALIAS }}
+          ETA_RELEASE_KEY_PASSWORD: ${{ secrets.ETA_RELEASE_KEY_PASSWORD }}
+        run: >-
+          ./gradlew --no-daemon --no-configuration-cache
+          :app:assembleRelease
+
+      - name: 验证 APK 签名与版本
+        id: apk
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          release_apks=(app/build/outputs/apk/release/*.apk)
+          if [[ ${#release_apks[@]} -ne 1 ]]; then
+            echo "::error::Release APK 数量异常（${#release_apks[@]}）。"
+            exit 1
+          fi
+          apksigner_path="$(find "$ANDROID_HOME/build-tools" \
+            -type f -name apksigner | sort -V | tail -n 1)"
+          if [[ -z "$apksigner_path" ]]; then
+            echo "::error::未找到 apksigner。"
+            exit 1
+          fi
+          "$apksigner_path" verify "${release_apks[0]}"
+
+          # 构建产物里的 versionName 必须与 prepare 读到的值一致，避免打错包
+          built_version="$(jq -r '.elements[0].versionName' \
+            app/build/outputs/apk/release/output-metadata.json)"
+          if [[ "$built_version" != "${{ needs.prepare.outputs.version_name }}" ]]; then
+            echo "::error::构建产物 versionName（$built_version）与预期不符。"
+            exit 1
+          fi
+          echo "release_path=${release_apks[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: 上传 Release APK 供人工检查
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          path: ${{ steps.apk.outputs.release_path }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: 创建 Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APK_PATH: ${{ steps.apk.outputs.release_path }}
+          VERSION_NAME: ${{ needs.prepare.outputs.version_name }}
+        run: >-
+          gh release create "v${VERSION_NAME}" "$APK_PATH"
+          --repo "$GITHUB_REPOSITORY"
+          --target "$GITHUB_SHA"
+          --title "v${VERSION_NAME}"
+          --generate-notes

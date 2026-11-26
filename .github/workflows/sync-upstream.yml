@@ -1,0 +1,126 @@
+name: Sync Upstream
+
+# 每天 UTC 02:30 检查上游 Sam-Fic/EtaExpressive 是否有新提交。
+#
+# 无新提交：直接跳过，不建分支、不开 PR（避免每天刷出空动作）。
+# 有新提交：建 sync/upstream-<日期> 分支并合并，成功则开 PR；
+#           存在冲突则中止合并、开一条 issue 说明，交给人工处理。
+#
+# 只读上游 public 仓库，不需要额外凭据；写本仓库用 GITHUB_TOKEN。
+
+on:
+  schedule:
+    # UTC 02:30；GitHub 的 cron 高峰期可能延迟几分钟到十几分钟，属正常。
+    - cron: "30 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: 检查并同步上游
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: 检出本仓库
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: 比对上游
+        id: compare
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git remote get-url upstream >/dev/null 2>&1; then
+            git remote set-url upstream https://github.com/Sam-Fic/EtaExpressive.git
+          else
+            git remote add upstream https://github.com/Sam-Fic/EtaExpressive.git
+          fi
+          git fetch --no-tags upstream main
+
+          behind="$(git rev-list --count HEAD..upstream/main)"
+          echo "behind=${behind}" >> "$GITHUB_OUTPUT"
+          echo "branch=sync/upstream-$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
+
+          if [[ "$behind" -eq 0 ]]; then
+            echo "上游没有新提交，跳过（不建分支、不开 PR）。"
+            echo "has_updates=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "上游有 ${behind} 个新提交。"
+            echo "has_updates=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 合并上游并开 PR
+        if: steps.compare.outputs.has_updates == 'true'
+        id: merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.compare.outputs.branch }}
+          BEHIND: ${{ steps.compare.outputs.behind }}
+        run: |
+          set -euo pipefail
+          git checkout -B "$BRANCH"
+
+          if git merge --no-edit upstream/main; then
+            git push --force-with-lease origin "$BRANCH"
+            pr_url="$(gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --base main \
+              --head "$BRANCH" \
+              --title "chore(sync): 同步上游 ${BEHIND} 个提交" \
+              --body "自动同步 [Sam-Fic/EtaExpressive](https://github.com/Sam-Fic/EtaExpressive) 的 ${BEHIND} 个新提交。
+
+          合并前请确认：
+          - app/build.gradle.kts 的 versionName/versionCode 是否需要按本 fork 的节奏调整（versionName 同时决定自动发版的 tag）。
+          - 若有冲突已在本地解决，请复核语义而不只是消除标记。
+
+          合并到 main 后，auto-release 会按 versionName 判断是否发包。")"
+            echo "pr_url=${pr_url}" >> "$GITHUB_OUTPUT"
+            echo "conflict=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::上游合并存在冲突，已中止合并，改为开 issue 交人工处理。"
+            conflicted="$(git diff --name-only --diff-filter=U | tr '\n' ' ')"
+            git merge --abort
+            echo "conflict=true" >> "$GITHUB_OUTPUT"
+            echo "conflicted_files=${conflicted}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 冲突时开 issue
+        if: steps.merge.outputs.conflict == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.compare.outputs.branch }}
+          BEHIND: ${{ steps.compare.outputs.behind }}
+          CONFLICTED: ${{ steps.merge.outputs.conflicted_files }}
+        run: |
+          set -euo pipefail
+          existing="$(gh issue list --repo "$GITHUB_REPOSITORY" \
+            --state open --search "in:title [sync-upstream]" --json number --jq 'length')"
+          if [[ "$existing" != "0" ]]; then
+            echo "已有未处理的同步冲突 issue，跳过重复创建。"
+            exit 0
+          fi
+          gh issue create --repo "$GITHUB_REPOSITORY" \
+            --title "[sync-upstream] 上游合并存在冲突，需要手动处理" \
+            --body "自动同步上游 ${BEHIND} 个提交时遇到冲突，已中止合并、未改动 main。
+
+          冲突文件：
+          ${CONFLICTED}
+
+          手动处理：
+            git fetch upstream main
+            git checkout -b ${BRANCH}
+            git merge upstream/main   # 逐个解决冲突
+
+          本 issue 关闭后，下一次定时任务会重新尝试。"
