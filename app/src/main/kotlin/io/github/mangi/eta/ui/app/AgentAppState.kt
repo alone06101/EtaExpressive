@@ -5354,7 +5354,7 @@ internal class AgentAppState(
         val runConfig = GptSpeedModePolicy.snapshot(
             RuntimeConfigRepository.buildRuntimeConfig(effectiveProvider, effectiveModel, runAssistant),
             rememberedGptSpeedMode(state.providerId, state.modelId),
-            supportsGptSpeedBinding(effectiveProvider, effectiveModel),
+            supportsGptSpeedBinding(runProvider, runModel),
         )
         val runModelOption = AgentModelPickerProjector.project(
             listOf(effectiveProvider), effectiveProvider.id, effectiveModel.id,
