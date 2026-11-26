@@ -104,6 +104,7 @@ internal fun AgentAppShell(
     onMoveConversationToFolder: (ConversationSummaryUi) -> Unit = {},
     onConversationTogglePin: (ConversationSummaryUi) -> Unit = {},
     onConversationExport: (ConversationSummaryUi) -> Unit = {},
+    onConversationDuplicate: (ConversationSummaryUi) -> Unit = {},
     onConversationAnalysisExport: (ConversationSummaryUi) -> Unit = {},
     onOpenManageChats: () -> Unit = {},
     // 抽屉工具栏里的放大镜：与管理页同一入口（全文搜索页，跨会话检索）。
@@ -254,6 +255,7 @@ internal fun AgentAppShell(
                 onMoveConversationToFolder = onMoveConversationToFolder,
                 onConversationTogglePin = onConversationTogglePin,
                 onConversationExport = onConversationExport,
+                onConversationDuplicate = onConversationDuplicate,
                 onConversationAnalysisExport = onConversationAnalysisExport,
                 onNewConversation = onNewConversation,
                 onOpenSearchHistory = onOpenDrawerSearch,

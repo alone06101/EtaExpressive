@@ -98,6 +98,7 @@ import io.github.mangi.eta.data.model.withModels
 import io.github.mangi.eta.data.repository.AgentMemoryRepository
 import io.github.mangi.eta.data.repository.EtaBackupExportOptions
 import io.github.mangi.eta.data.repository.AgentConversationHistoryFiles
+import io.github.mangi.eta.data.repository.ConversationDuplicateRepository
 import io.github.mangi.eta.data.repository.EtaBackupRepository
 import io.github.mangi.eta.data.repository.EtaBackupSummary
 import io.github.mangi.eta.data.repository.EtaConversationAnalysisCodec
@@ -2571,6 +2572,19 @@ internal class AgentAppState(
     ): EtaBackupSummary = withConversationArchive(requireIdleRuns = false) {
         EtaBackupRepository.export(appContext, output, options)
     }
+
+    /**
+     * 克隆一个会话，返回新会话 id。
+     *
+     * 走与「导入会话分析」同一条链路（导出 → 导入为新会话），再回写同机副本应有的
+     * provider/model/assistant/folder 与标题后缀；完成后重载会话列表，副本立刻可见。
+     */
+    suspend fun duplicateConversation(conversationId: String, titleSuffix: String): String =
+        withConversationArchive(requireIdleRuns = false) {
+            val id = ConversationDuplicateRepository.duplicate(appContext, conversationId, titleSuffix)
+            reloadConversationsAfterBackup()
+            id
+        }
 
     suspend fun exportConversation(conversationId: String, output: OutputStream): EtaBackupSummary =
         withConversationArchive(requireIdleRuns = false) {

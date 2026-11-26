@@ -2296,6 +2296,11 @@
   <string name="copy_conversation_empty">這個會話還沒有可複製的內容</string>
   <string name="copy_conversation_truncated">內容過長，已複製開頭部分</string>
   <string name="copy_message_done">已複製</string>
+  <string name="action_duplicate_conversation">建立會話副本</string>
+  <string name="conversation_duplicate_suffix">（副本）</string>
+  <string name="conversation_duplicate_done">已建立會話副本</string>
+  <string name="conversation_duplicate_failed">建立副本失敗</string>
+  <string name="conversation_duplicate_busy">正在建立副本，請稍候</string>
   <string name="provider_system_prompt_title">系統提示詞</string>
   <string name="provider_system_prompt_label">系統提示詞</string>
   <string name="provider_system_prompt_summary">留空則不注入。助手的「跟隨服務商」開啟且此處有內容時，執行時優先使用它，助手人格與能力塊追加在其後。</string>

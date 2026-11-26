@@ -1,6 +1,5 @@
 package io.github.mangi.eta.ui.components
 
-import android.widget.Toast
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector
 import androidx.compose.animation.core.DecayAnimationSpec
@@ -12,8 +11,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import io.github.mangi.eta.agent.remote.RemoteConnectionStatus
 import io.github.mangi.eta.agent.remote.RemoteSessionInfo
-import io.github.mangi.eta.data.repository.ConversationPlainText
-import io.github.mangi.eta.ui.adaptive.rememberCopyToClipboard
 import io.github.mangi.eta.ui.remote.remoteStatusLabel
 import io.github.mangi.eta.ui.model.RemotePaneServer
 import androidx.compose.foundation.gestures.Orientation
@@ -148,7 +145,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -265,6 +261,7 @@ fun ConversationSidePaneScaffold(
     onMoveConversationToFolder: (ConversationSummaryUi) -> Unit = {},
     onConversationTogglePin: (ConversationSummaryUi) -> Unit = {},
     onConversationExport: (ConversationSummaryUi) -> Unit = {},
+    onConversationDuplicate: (ConversationSummaryUi) -> Unit = {},
     onConversationAnalysisExport: (ConversationSummaryUi) -> Unit = {},
     onNewConversation: () -> Unit = {},
     onOpenSearchHistory: () -> Unit = {},
@@ -494,6 +491,7 @@ fun ConversationSidePaneScaffold(
                     onMoveConversationToFolder = onMoveConversationToFolder,
                     onConversationTogglePin = onConversationTogglePin,
                     onConversationExport = onConversationExport,
+                    onConversationDuplicate = onConversationDuplicate,
                     onConversationAnalysisExport = onConversationAnalysisExport,
                     onOpenManageChats = onOpenManageChats,
                     onSelectFolder = onSelectFolder,
@@ -706,6 +704,7 @@ private fun ConversationPanePanel(
     onMoveConversationToFolder: (ConversationSummaryUi) -> Unit = {},
     onConversationTogglePin: (ConversationSummaryUi) -> Unit = {},
     onConversationExport: (ConversationSummaryUi) -> Unit = {},
+    onConversationDuplicate: (ConversationSummaryUi) -> Unit = {},
     onConversationAnalysisExport: (ConversationSummaryUi) -> Unit = {},
     onOpenManageChats: () -> Unit = {},
     onSelectFolder: (String?) -> Unit = {},
@@ -744,6 +743,7 @@ private fun ConversationPanePanel(
         onMoveConversationToFolder = onMoveConversationToFolder,
         onConversationTogglePin = onConversationTogglePin,
         onConversationExport = onConversationExport,
+        onConversationDuplicate = onConversationDuplicate,
         onConversationAnalysisExport = onConversationAnalysisExport,
         onOpenManageChats = onOpenManageChats,
         onSelectFolder = onSelectFolder,
@@ -827,6 +827,7 @@ private fun Material3ConversationPane(
     onMoveConversationToFolder: (ConversationSummaryUi) -> Unit,
     onConversationTogglePin: (ConversationSummaryUi) -> Unit,
     onConversationExport: (ConversationSummaryUi) -> Unit,
+    onConversationDuplicate: (ConversationSummaryUi) -> Unit,
     onConversationAnalysisExport: (ConversationSummaryUi) -> Unit,
     onOpenManageChats: () -> Unit,
     onSelectFolder: (String?) -> Unit,
@@ -1043,6 +1044,7 @@ private fun Material3ConversationPane(
                                     onMoveToFolder = { onMoveConversationToFolder(conversation) },
                                     onTogglePin = { onConversationTogglePin(conversation) },
                                     onExport = { onConversationExport(conversation) },
+                                    onDuplicate = { onConversationDuplicate(conversation) },
                                     onExportAnalysis = { onConversationAnalysisExport(conversation) },
                                     // 官方 animateItem：删除/移动文件夹淡出、置顶跨组 = 同 key
                                     // 换位弹簧（分组各自 itemsIndexed 共用同一 key 空间）；
@@ -1423,14 +1425,11 @@ private fun Material3ConversationRow(
     onMoveToFolder: () -> Unit,
     onTogglePin: () -> Unit,
     onExport: () -> Unit,
+    onDuplicate: () -> Unit,
     onExportAnalysis: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var showActionMenu by remember { mutableStateOf(false) }
-    // 复制会话全文：只读 DB 拼纯文本，不经过导出流程（不需要 SAF 选文件）。
-    val context = LocalContext.current
-    val copyToClipboard = rememberCopyToClipboard()
-    val copyScope = rememberCoroutineScope()
     // 「等待回答」问号徽标的读屏说明（行尾 trailing 槽内引用）。
     val waitingBadgeDescription = stringResource(R.string.dispatch_question_waiting_badge)
     EtaSegmentedItem(index = index, count = count) {
@@ -1597,25 +1596,11 @@ private fun Material3ConversationRow(
                         DrawerActionMenuItem(
                             index = actionIndex++,
                             count = actionCount,
-                            text = stringResource(R.string.action_copy_conversation),
+                            text = stringResource(R.string.action_duplicate_conversation),
                             icon = Icons.Rounded.ContentCopy,
                             onClick = {
                                 showActionMenu = false
-                                copyScope.launch {
-                                    val result = runCatching {
-                                        ConversationPlainText.build(context, conversation.id)
-                                    }.getOrNull()
-                                    val message = when {
-                                        result == null || result.text.isBlank() ->
-                                            context.getString(R.string.copy_conversation_empty)
-                                        result.truncated ->
-                                            context.getString(R.string.copy_conversation_truncated)
-                                        else ->
-                                            context.getString(R.string.copy_conversation_done, result.messageCount)
-                                    }
-                                    result?.text?.takeIf { it.isNotBlank() }?.let(copyToClipboard)
-                                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                                }
+                                onDuplicate()
                             },
                         )
                         DrawerActionMenuItem(

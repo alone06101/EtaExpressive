@@ -74,6 +74,28 @@ internal interface ConversationDao {
     @Query("SELECT * FROM conversations ORDER BY updated_at ASC")
     suspend fun conversationEntities(): List<ConversationEntity>
 
+    /**
+     * 只更新副本的展示与绑定元数据。
+     *
+     * 克隆走的是「导出会话分析 → 导入为新会话」这条已验证的链路，导入端会把
+     * provider/model/assistant 留空、标题原样、folder 置空（它面向跨设备迁移）。
+     * 同机副本需要把这几项还原成源会话的值，否则副本会回落默认模型、跑出别的分类。
+     */
+    @Query(
+        "UPDATE conversations SET title = :title, provider_id = :providerId, " +
+        "model_id = :modelId, assistant_id = :assistantId, folder_id = :folderId, " +
+        "updated_at = :updatedAt WHERE id = :id"
+    )
+    suspend fun updateCloneMetadata(
+        id: String,
+        title: String,
+        providerId: String,
+        modelId: String,
+        assistantId: String,
+        folderId: String,
+        updatedAt: Long,
+    )
+
     @Query("SELECT * FROM conversation_context_checkpoints ORDER BY conversation_id ASC")
     suspend fun contextCheckpoints(): List<ConversationContextCheckpointEntity>
 

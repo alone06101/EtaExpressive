@@ -2318,6 +2318,11 @@
   <string name="copy_conversation_empty">This conversation has nothing to copy yet</string>
   <string name="copy_conversation_truncated">Too long, copied the beginning only</string>
   <string name="copy_message_done">Copied</string>
+  <string name="action_duplicate_conversation">Duplicate conversation</string>
+  <string name="conversation_duplicate_suffix"> (copy)</string>
+  <string name="conversation_duplicate_done">Conversation copy created</string>
+  <string name="conversation_duplicate_failed">Failed to create a copy</string>
+  <string name="conversation_duplicate_busy">Creating a copy, please wait</string>
   <string name="provider_system_prompt_title">System prompt</string>
   <string name="provider_system_prompt_label">System prompt</string>
   <string name="provider_system_prompt_summary">Leave blank to skip. When the assistant follows the provider and this is filled, the runtime uses it as the base prompt and appends the personality and capability blocks after it.</string>

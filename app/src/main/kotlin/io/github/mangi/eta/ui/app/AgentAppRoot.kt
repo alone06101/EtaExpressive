@@ -837,6 +837,38 @@ fun AgentAppRoot(
             conversationExportConfirmation = true
         }
     }
+    /**
+     * 创建会话副本。
+     *
+     * 克隆走「导出会话分析 → 导入为新会话」，与手动导入共用一条链路；
+     * 完成后 AgentAppState 会重载会话列表，副本立刻出现在原分类里。
+     * 用 busy 标记防重复点击：一次克隆要读写整库，连点会互相踩。
+     */
+    var conversationDuplicateBusy by remember { mutableStateOf(false) }
+    val duplicateConversation: (ConversationSummaryUi) -> Unit = { conversation ->
+        if (conversationDuplicateBusy) {
+            Toast.makeText(context, context.getString(R.string.conversation_duplicate_busy), Toast.LENGTH_SHORT).show()
+        } else {
+            conversationDuplicateBusy = true
+            uiScope.launch {
+                val result = runCatching {
+                    agentState.duplicateConversation(
+                        conversation.id,
+                        context.getString(R.string.conversation_duplicate_suffix),
+                    )
+                }
+                conversationDuplicateBusy = false
+                Toast.makeText(
+                    context,
+                    result.fold(
+                        onSuccess = { context.getString(R.string.conversation_duplicate_done) },
+                        onFailure = { it.message ?: context.getString(R.string.conversation_duplicate_failed) },
+                    ),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+        }
+    }
     val exportConversationAnalysis: (ConversationSummaryUi) -> Unit = { conversation ->
         if (conversationAnalysisExportBusy || conversationAnalysisExportId != null) {
             Toast.makeText(context, context.getString(R.string.appst_export_in_progress), Toast.LENGTH_SHORT).show()
@@ -995,6 +1027,7 @@ fun AgentAppRoot(
                 agentState.toggleConversationPinned(conversation.id)
             },
             onConversationExport = exportConversation,
+            onConversationDuplicate = duplicateConversation,
             onConversationAnalysisExport = exportConversationAnalysis,
             onOpenManageChats = { pushFromDrawer(AppRoute.ManageChats) },
             // 抽屉搜索与管理页的放大镜同一个目的地：跨会话全文搜索。
