@@ -112,6 +112,15 @@ internal object CapabilityAssistRouter {
 
         /** 需要模型能调用工具 */
         TOOL_CALL,
+
+        /**
+         * 需要更大的上下文窗口。
+         *
+         * 这一维没有「模型自身支不支持」的语义：每个模型都有窗口，只有够不够大。
+         * 具体阈值由 [pickFor] 的 minContextTokens 提供，[matches] 只负责排除
+         * 不适合作聊天主体的模型（媒体生成、纯语音合成）。
+         */
+        CONTEXT_WINDOW,
     }
 
     /** 单个模型是否满足某个能力维度。 */
@@ -123,6 +132,8 @@ internal object CapabilityAssistRouter {
         Capability.VIDEO_OUTPUT -> model.supportsVideoGeneration
         // 只有明确标注「不支持工具」才算缺；null 表示未知，按支持处理，避免误切。
         Capability.TOOL_CALL -> model.toolCall != false
+        Capability.CONTEXT_WINDOW ->
+            !model.supportsImageGeneration && !model.supportsVideoGeneration && !model.supportsSpeechSynthesis
     }
 
     /** 本轮需要的媒体输出类型。 */
@@ -137,6 +148,7 @@ internal object CapabilityAssistRouter {
     suspend fun pickFor(
         capability: Capability,
         excludedProviderId: String?,
+        minContextTokens: Int? = null,
     ): Pair<ProviderSetting, Model>? = withContext(Dispatchers.IO) {
         val settings = runCatching { SettingsDataStore.capabilityAssist() }.getOrNull() ?: return@withContext null
         if (!settings.enabled) return@withContext null
@@ -147,6 +159,7 @@ internal object CapabilityAssistRouter {
                 .getOrNull()?.takeIf { it.isEnabled } ?: continue
             val model = provider.models
                 .filter { it.isEnabled && matches(it, capability) }
+                .filter { minContextTokens == null || (it.effectiveContextWindow ?: 0) >= minContextTokens }
                 .sortedBy { it.sortOrder }
                 .firstOrNull() ?: continue
             AndroidAgentLogger.debug {
@@ -161,9 +174,10 @@ internal object CapabilityAssistRouter {
     fun pickForBlocking(
         capability: Capability,
         excludedProviderId: String?,
+        minContextTokens: Int? = null,
     ): Pair<ProviderSetting, Model>? =
         runCatching {
-            kotlinx.coroutines.runBlocking { pickFor(capability, excludedProviderId) }
+            kotlinx.coroutines.runBlocking { pickFor(capability, excludedProviderId, minContextTokens) }
         }.getOrNull()
 
     /**

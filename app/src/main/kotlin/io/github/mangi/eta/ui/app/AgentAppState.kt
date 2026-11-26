@@ -5341,6 +5341,25 @@ internal class AgentAppState(
             assistProvider = toolAssist?.first
             assistModel = toolAssist?.second
         }
+        // 窗口协助优先级高于工具协助：窗口是硬限制，不换就跑不动，而工具缺口只是能力降级。
+        // 只用上一轮的实测锚点判断（不含本轮新增），没有锚点（首轮、刚压缩过）时不介入，
+        // 宁可晚一轮也不误切。
+        val billedTokens = billedPromptTokens(state)
+        val windowCeiling = (assistModel ?: runModel).effectiveContextWindow
+        if (
+            billedTokens != null && billedTokens > 0 && windowCeiling != null &&
+            billedTokens >= windowCeiling * 0.9
+        ) {
+            val windowAssist = CapabilityAssistRouter.pickForBlocking(
+                CapabilityAssistRouter.Capability.CONTEXT_WINDOW,
+                excludedProviderId = (assistProvider ?: runProvider).id,
+                minContextTokens = billedTokens,
+            )
+            if (windowAssist != null) {
+                assistProvider = windowAssist.first
+                assistModel = windowAssist.second
+            }
+        }
         val effectiveProvider = assistProvider ?: runProvider
         val effectiveModel = assistModel ?: runModel
         if (effectiveModel.supportsSpeechSynthesis) {
