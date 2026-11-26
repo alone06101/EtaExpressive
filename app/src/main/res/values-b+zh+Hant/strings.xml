@@ -2297,6 +2297,14 @@
   <string name="conversation_duplicate_failed">建立副本失敗</string>
   <string name="conversation_duplicate_busy">正在建立副本，請稍候</string>
   <string name="webdav_password_encrypt_failed">無法加密密碼（金鑰庫不可用），密碼未儲存</string>
+  <string name="capability_assist_title">能力協助</string>
+  <string name="capability_assist_entry_title">協助順序</string>
+  <string name="capability_assist_entry_summary">首選模型缺少視覺或影片能力時，依序臨時交給下面的提供商完成這一輪</string>
+  <string name="capability_assist_enable">啟用能力協助</string>
+  <string name="capability_assist_hint">依序嘗試；未勾選的提供商不參與。首選模型本身支援時不會切換，下一輪自動回到首選。</string>
+  <string name="capability_assist_empty">還沒有啟用的提供商</string>
+  <string name="capability_assist_move_up">上移</string>
+  <string name="capability_assist_move_down">下移</string>
   <string name="provider_system_prompt_title">系統提示詞</string>
   <string name="provider_system_prompt_label">系統提示詞</string>
   <string name="provider_system_prompt_summary">留空則不注入。助手的「跟隨服務商」開啟且此處有內容時，執行時優先使用它，助手人格與能力塊追加在其後。</string>

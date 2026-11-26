@@ -1,5 +1,7 @@
 package io.github.mangi.eta.ui.pages.providers
 
+import io.github.mangi.eta.data.datastore.SettingsDataStore
+import io.github.mangi.eta.data.model.CapabilityAssistSettings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -93,6 +95,9 @@ internal fun ModelProviderListScreen(
     var selectedProviderIds by remember { mutableStateOf(setOf<String>()) }
     var showBatchDeleteDialog by remember { mutableStateOf(false) }
     var isDeleting by remember { mutableStateOf(false) }
+    var showCapabilityAssist by remember { mutableStateOf(false) }
+    val assistSettings by SettingsDataStore.capabilityAssistFlow()
+        .collectAsState(initial = CapabilityAssistSettings())
 
     // 主页不过滤（query 恒空即全量），搜索交给独立搜索页。
     val filteredProviders = providers
@@ -194,6 +199,10 @@ internal fun ModelProviderListScreen(
                         },
                     )
                 },
+                onOpenCapabilityAssist = {
+                    TouchHaptics.click(view)
+                    showCapabilityAssist = true
+                },
             )
 
             // 选择模式下预留底部操作条高度；其余场景用骨架自带的底距。
@@ -202,6 +211,18 @@ internal fun ModelProviderListScreen(
                     EtaSelectionBottomSpacer(isSelecting = true)
                 }
             }
+        }
+
+        if (showCapabilityAssist) {
+            CapabilityAssistDialog(
+                providers = providers.filter { it.isEnabled },
+                settings = assistSettings,
+                onDismiss = { showCapabilityAssist = false },
+                onSave = { next ->
+                    showCapabilityAssist = false
+                    scope.launch { SettingsDataStore.setCapabilityAssist(next) }
+                },
+            )
         }
 
         // 批量操作栏：共享多选套件的官方 M3E 浮动药丸，底部居中悬浮（原 EtaCard 文字按钮卡
@@ -305,7 +326,25 @@ internal fun androidx.compose.foundation.lazy.LazyListScope.materialProviderList
     onOpen: (String) -> Unit,
     onEnterSelection: (String) -> Unit,
     onAddProvider: (NewProviderType) -> Unit,
+    onOpenCapabilityAssist: () -> Unit = {},
 ) {
+    if (filteredProviders.isNotEmpty()) {
+        item(key = "capability_assist_entry") {
+            EtaSegmentedColumn(
+                modifier = SectionGroupPadding,
+                title = stringResource(R.string.capability_assist_title),
+            ) {
+                item {
+                    ProviderClickableRow(
+                        title = stringResource(R.string.capability_assist_entry_title),
+                        summary = stringResource(R.string.capability_assist_entry_summary),
+                        onClick = onOpenCapabilityAssist,
+                    )
+                }
+            }
+        }
+    }
+
     item(key = "create_section") {
         EtaSegmentedColumn(
             modifier = SectionGroupPadding,
