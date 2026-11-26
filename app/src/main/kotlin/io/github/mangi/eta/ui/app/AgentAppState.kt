@@ -4199,17 +4199,10 @@ internal class AgentAppState(
                 pendingImages.isNotEmpty() ||
                 pendingFileReferences.isNotEmpty() || pendingMentions.isNotEmpty()
             ) {
-                val conversationId = selectedConversationId
-                // 纯文字短按排队；附件、引用、编辑态与暂停中的插话仍立即送入当前运行。
-                if (
-                    conversationId != null && homeState.isStreaming && !homeState.isPaused &&
-                    homeState.messageEdit == null && pendingImages.isEmpty() &&
-                    pendingFileReferences.isEmpty() && pendingMentions.isEmpty() && prompt.isNotBlank()
-                ) {
-                    enqueueQueuedMessage(conversationId, prompt)
-                } else {
-                    steerCurrentRun(submittedText ?: currentDraftField().text.toString())
-                }
+                // 运行中发送一律作为「插话」立即送入当前运行（steer）：运行时会在下一个
+                // 轮次边界注入补充，流式正文中途则打断当前请求但保留已写出的内容。
+                // 之前纯文字被强制排队等本轮结束，与输入栏在流式时显示「发送」的行为不一致。
+                steerCurrentRun(submittedText ?: currentDraftField().text.toString())
             }
             return
         }
@@ -4346,6 +4339,13 @@ internal class AgentAppState(
     }
 
     /** 把纯文字消息追加到会话队尾，并清空该会话草稿（正文已移入队列，不再保留在输入框）。 */
+    /**
+     * 把消息挂到会话的「待发队列」，等本轮结束后再发。
+     *
+     * 运行中的发送现在一律走 [steerCurrentRun]（立即插话），因此这里暂时没有调用点；
+     * 保留是因为队列展示链路（AgentChatBody 的 queuedMessages）仍在，将来要给用户
+     * 一个显式的「排到下一轮」入口时直接用这条路径，不必重写。
+     */
     private fun enqueueQueuedMessage(conversationId: String, text: String) {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return
