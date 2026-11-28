@@ -2624,9 +2624,13 @@ internal class AgentAppState(
             if (modelPickerState.isChanging) {
                 error(appContext.getString(R.string.archive_blocked_by_model_switch))
             }
-            if (runtimeRecoveryInProgress.get()) {
-                error(appContext.getString(R.string.archive_blocked_by_recovery))
-            }
+            // 刻意不检查 runtimeRecoveryInProgress：
+            // 恢复做的是「把外部入口（语音浮窗等）的 run 状态刷进已有会话」，
+            // 与导入写入一条新会话没有数据冲突；两者的持久化都走 conversationPersistenceMutex，
+            // 不会互相覆盖。而恢复内部有跨进程 Binder 调用（AgentRuntimeClient），
+            // 服务不可达时会长时间阻塞且无法被协程超时打断——把它当成前置条件，
+            // 等于让导入被一个自己控制不了的等待拖死（真机现场：两个导入入口都被
+            // 「正在恢复上次运行」永久挡住）。
         }
         conversationArchiveBusy = true
         try {
