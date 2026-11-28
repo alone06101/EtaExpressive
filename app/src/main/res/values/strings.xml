@@ -2340,6 +2340,13 @@
   <string name="analysis_exporting_message">Generating the analysis file. Large conversations may take a while.</string>
   <string name="analysis_import_into_not_empty">The target conversation already has content; import only works on an empty one</string>
   <string name="action_import_analysis_into">Import an analysis file into this conversation</string>
+  <string name="archive_blocked_by_streaming">Conversation "%1$s" is still generating a reply. Import once it finishes.</string>
+  <string name="archive_blocked_by_compressing">Conversation "%1$s" is compressing context. Import in a moment.</string>
+  <string name="archive_blocked_by_compressing_unknown">Context compression is running. Import in a moment.</string>
+  <string name="archive_blocked_by_children">%1$d sub-agent tasks are running. Import once they finish.</string>
+  <string name="archive_blocked_by_manual_compress">Context compression has not finished yet. Import in a moment.</string>
+  <string name="archive_blocked_by_model_switch">The model is switching. Try importing again in a second.</string>
+  <string name="archive_blocked_by_recovery">Recovering the previous run. Import once it finishes.</string>
   <string name="provider_system_prompt_title">System prompt</string>
   <string name="provider_system_prompt_label">System prompt</string>
   <string name="provider_system_prompt_summary">Leave blank to skip. When the assistant follows the provider and this is filled, the runtime uses it as the base prompt and appends the personality and capability blocks after it.</string>

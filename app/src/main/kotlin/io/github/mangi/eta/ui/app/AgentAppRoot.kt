@@ -409,7 +409,7 @@ fun AgentAppRoot(
     var remoteSwitchTarget by remember {
         mutableStateOf<io.github.mangi.eta.ui.remote.ChatTarget.Remote?>(null)
     }
-    var conversationExportId by rememberSaveable { mutableStateOf<String?>(null) }
+    var conversationExportId by remember { mutableStateOf<String?>(null) }
 
     // 定时发送：应用在前台且正停留在目标会话时，到点的消息自动发出。
     val scheduledSendContext = androidx.compose.ui.platform.LocalContext.current
@@ -430,7 +430,7 @@ fun AgentAppRoot(
     var conversationExportBusy by remember { mutableStateOf(false) }
     var conversationExportConfirmation by rememberSaveable { mutableStateOf(false) }
 
-    var conversationAnalysisExportId by rememberSaveable { mutableStateOf<String?>(null) }
+    var conversationAnalysisExportId by remember { mutableStateOf<String?>(null) }
     var conversationAnalysisExportTitle by rememberSaveable { mutableStateOf("") }
     var conversationAnalysisIncludeRawIo by rememberSaveable { mutableStateOf(false) }
     var conversationAnalysisIncludeImages by rememberSaveable { mutableStateOf(false) }
@@ -536,6 +536,13 @@ fun AgentAppRoot(
                 analysisImportIntoConversationId = null
             }
         }
+    }
+
+    // 陈旧建出任务兜底：没有正在进行的导出时，残留的目标 id 会让「导出/导入分析文件」
+    // 永远提示「已有会话导出任务，请等待完成」。id 已改为不跨进程保存，这里再兜一层。
+    LaunchedEffect(conversationExportBusy, conversationAnalysisExportBusy) {
+        if (!conversationExportBusy) conversationExportId = null
+        if (!conversationAnalysisExportBusy) conversationAnalysisExportId = null
     }
 
     val conversationAnalysisExportLauncher = rememberLauncherForActivityResult(

@@ -2524,14 +2524,47 @@ internal class AgentAppState(
     ): T = withContext(Dispatchers.Main.immediate) {
         check(!conversationArchiveBusy && !conversationRevisionBusy) { "已有对话归档或修订任务正在执行" }
         if (requireIdleRuns) {
-            check(
-                !runtimeRecoveryInProgress.get() &&
-                    !modelPickerState.isChanging &&
-                    pendingManualCompress == null &&
-                    runJobs.isEmpty() &&
-                    compressionJob?.isActive != true &&
-                    conversationsById.values.none { it.isStreaming || it.isCompressingContext },
-            ) { "请先等待对话任务或恢复完成" }
+            // 分原因拒绝：原来只有一句「请先等待对话任务或恢复完成」，用户不知道在等谁。
+            // 判据顺序按「用户最可能先看到的现象」排：生成中 > 压缩中 > 子代理 > 切换 > 恢复。
+            val streamingId = conversationsById.entries.firstOrNull { it.value.isStreaming }?.key
+            if (streamingId != null) {
+                error(
+                    appContext.getString(
+                        R.string.archive_blocked_by_streaming,
+                        conversationTitles[streamingId].orEmpty().ifBlank {
+                            appContext.getString(R.string.conversation_unnamed)
+                        },
+                    ),
+                )
+            }
+            val compressingId = conversationsById.entries
+                .firstOrNull { it.value.isCompressingContext }?.key
+            if (compressingId != null || compressionJob?.isActive == true) {
+                val name = compressingId?.let { id ->
+                    conversationTitles[id].orEmpty().ifBlank {
+                        appContext.getString(R.string.conversation_unnamed)
+                    }
+                }
+                error(
+                    if (name != null) {
+                        appContext.getString(R.string.archive_blocked_by_compressing, name)
+                    } else {
+                        appContext.getString(R.string.archive_blocked_by_compressing_unknown)
+                    },
+                )
+            }
+            if (runJobs.isNotEmpty()) {
+                error(appContext.getString(R.string.archive_blocked_by_children, runJobs.size))
+            }
+            if (pendingManualCompress != null) {
+                error(appContext.getString(R.string.archive_blocked_by_manual_compress))
+            }
+            if (modelPickerState.isChanging) {
+                error(appContext.getString(R.string.archive_blocked_by_model_switch))
+            }
+            if (runtimeRecoveryInProgress.get()) {
+                error(appContext.getString(R.string.archive_blocked_by_recovery))
+            }
         }
         conversationArchiveBusy = true
         try {

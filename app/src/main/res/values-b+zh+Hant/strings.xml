@@ -2318,6 +2318,13 @@
   <string name="analysis_exporting_message">正在產生分析檔案，會話較大時需要一會兒</string>
   <string name="analysis_import_into_not_empty">目標會話已有內容，只能匯入到空白會話</string>
   <string name="action_import_analysis_into">匯入分析檔案到此會話</string>
+  <string name="archive_blocked_by_streaming">會話「%1$s」正在產生回覆，等它結束後再匯入</string>
+  <string name="archive_blocked_by_compressing">會話「%1$s」正在壓縮上下文，稍後再匯入</string>
+  <string name="archive_blocked_by_compressing_unknown">正在壓縮上下文，稍後再匯入</string>
+  <string name="archive_blocked_by_children">有 %1$d 個子代理任務在執行，等它們結束後再匯入</string>
+  <string name="archive_blocked_by_manual_compress">上下文壓縮還沒完成，稍後再匯入</string>
+  <string name="archive_blocked_by_model_switch">模型正在切換，稍等一秒再匯入</string>
+  <string name="archive_blocked_by_recovery">正在恢復上次執行，等它結束後再匯入</string>
   <string name="provider_system_prompt_title">系統提示詞</string>
   <string name="provider_system_prompt_label">系統提示詞</string>
   <string name="provider_system_prompt_summary">留空則不注入。助手的「跟隨服務商」開啟且此處有內容時，執行時優先使用它，助手人格與能力塊追加在其後。</string>
