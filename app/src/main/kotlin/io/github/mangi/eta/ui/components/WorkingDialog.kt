@@ -5,15 +5,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
+import io.github.mangi.eta.ui.adaptive.EtaLoadingSlot
 
 /**
  * 阻塞式进度提示。
@@ -38,9 +37,11 @@ internal fun WorkingDialog(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                CircularProgressIndicator(
+                // 走设计系统的加载组件（progress = null 表示不定型），
+                // 业务文件禁止直接实例化 CircularProgressIndicator。
+                EtaLoadingSlot(
+                    progress = null,
                     modifier = Modifier.padding(top = 4.dp),
-                    color = MaterialTheme.colorScheme.primary,
                 )
                 Text(
                     text = message,

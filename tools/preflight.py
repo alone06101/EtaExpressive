@@ -176,6 +176,55 @@ def check_doc_comment_integrity(path):
                 path + ':' + str(index + 1) + ' 注释正文里出现未闭合的注释开头（疑似注释被拆开）')
 
 
+def check_loading_indicator_wrappers(path):
+    """
+    业务文件禁止直接实例化进度/加载指示器，必须走 EtaLoadingSlot / EtaProgressBar。
+
+    与 app/src/test/kotlin/.../design/DesignSystemRulesTest 同源的规则；放在这里是为了
+    在编译前就失败，而不是等一轮 6 分钟的单元测试。
+    """
+    wrapper = 'ui/adaptive/EtaLoading.kt'
+    if path.replace(chr(92), '/').endswith(wrapper):
+        return
+    if '/agent/browser/ported/' in path:
+        return
+    # 与 DesignSystemRulesTest 里的 legacy 白名单保持一致：这些是明确不迁的存量文件。
+    legacy = (
+        'ui/components/ContainedMorphLoadingIndicator.kt',
+        'ui/components/AgentChatBody.kt',
+        'ui/components/AgentChatComposerM3.kt',
+        'ui/components/AgentChatInputBar.kt',
+        'ui/components/AgentStatusCard.kt',
+        'ui/components/ChatImagePreview.kt',
+        'ui/components/ChatMessageItem.kt',
+        'ui/components/ConversationSidePaneScaffold.kt',
+        'ui/components/SpeechPlaybackButton.kt',
+        'ui/screens/terminal/ConsoleScreen.kt',
+        'ui/screens/terminal/SharedFoldersScreen.kt',
+        'ui/screens/virtualdisplay/VirtualDisplaySections.kt',
+        'ui/screens/virtualdisplay/VirtualDisplayStage.kt',
+        'ui/screens/browser/AgentBrowserScreen.kt',
+        'ui/screens/search/MediaSearchScreen.kt',
+        'ui/ContextCompressionDialogs.kt',
+        'ui/ContextCompressionSettingsScreen.kt',
+        'ui/DoubaoVoiceSettings.kt',
+        'ui/OfflineSpeechPackColumn.kt',
+        'agent/overlay/AgentOverlayCapsule.kt',
+        'agent/voice/EtaVoicePanel.kt',
+    )
+    normalized = path.replace(chr(92), '/')
+    if any(normalized.endswith(item) for item in legacy):
+        return
+    pattern = re.compile(
+        r'\b(ContainedMorphLoadingIndicator|ContainedLoadingIndicator|'
+        r'CircularProgressIndicator|LinearProgressIndicator|'
+        r'CircularWavyProgressIndicator|LinearWavyProgressIndicator|LoadingIndicator)\s*\(')
+    for index, line in enumerate(read(path).split(chr(10)), 1):
+        if pattern.search(line):
+            problems.append(
+                path + ':' + str(index + 1) + ' 禁止直接实例化进度指示器，请改用 EtaLoadingSlot / EtaProgressBar')
+
+
 def check_strings_locales():
     paths = {
         'en': 'app/src/main/res/values/strings.xml',
@@ -255,6 +304,7 @@ def main():
         check_doc_comment_integrity(path)
         check_icon_imports(path)
         check_known_symbol_usage(path)
+        check_loading_indicator_wrappers(path)
     check_strings_locales()
 
     for item in warnings:
