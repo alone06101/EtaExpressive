@@ -72,6 +72,11 @@ jobs:
           curl --fail --location --retry 3 'https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-android/1.13.0-alpha01/ui-android-1.13.0-alpha01.aar' -o "$fixture"
           ./gradlew --no-daemon --no-configuration-cache -p buildSrc test -Deta.compose.semantics.originalAar="$fixture"
 
+      # 静态预检放在编译之前：注解被拆开、缺 import、@Query 参数不符这三类问题
+      # 编译期才暴露（KSP 阶段），而一次构建要 8 分钟。这里几十秒就能拦住。
+      - name: 静态预检
+        run: python3 tools/preflight.py
+
       - name: 运行单元测试
         timeout-minutes: 12
         run: python3 -u .github/scripts/run_unit_tests.py

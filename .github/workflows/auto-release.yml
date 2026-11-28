@@ -105,6 +105,10 @@ jobs:
             | base64 --decode \
             > "$RUNNER_TEMP/eta-release.p12"
 
+      # 发布链路同样先跑静态预检：发版失败比调试构建失败的代价更高。
+      - name: 静态预检
+        run: python3 tools/preflight.py
+
       - name: 构建 Release APK
         timeout-minutes: 30
         env:
