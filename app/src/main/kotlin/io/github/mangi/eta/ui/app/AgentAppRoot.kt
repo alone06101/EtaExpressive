@@ -493,6 +493,50 @@ fun AgentAppRoot(
         }
     }
 
+    // 「导入分析文件到此会话」：先记下目标会话，选完文件再读内容导入。
+    var analysisImportIntoConversationId by remember { mutableStateOf<String?>(null) }
+    var analysisImportIntoBusy by remember { mutableStateOf(false) }
+    val analysisImportIntoLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        val targetId = analysisImportIntoConversationId
+        if (uri == null || targetId == null) {
+            analysisImportIntoConversationId = null
+            return@rememberLauncherForActivityResult
+        }
+        uiScope.launch {
+            analysisImportIntoBusy = true
+            try {
+                val raw = withContext(Dispatchers.IO) {
+                    val declared = context.contentResolver
+                        .query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)
+                        ?.use { cursor -> if (cursor.moveToFirst()) cursor.getLong(0) else null }
+                    require(declared == null || declared <= ANALYSIS_IMPORT_MAX_BYTES) {
+                        context.getString(R.string.conversation_analysis_file_too_large)
+                    }
+                    val input = context.contentResolver.openInputStream(uri)
+                        ?: error(context.getString(R.string.data_backup_file_open_failed))
+                    input.use { stream -> stream.readBytes().toString(Charsets.UTF_8) }
+                }
+                agentState.importAnalysisIntoConversation(targetId, raw)
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.conversation_analysis_imported),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            } catch (throwable: Throwable) {
+                Toast.makeText(
+                    context,
+                    throwable.message ?: context.getString(R.string.appst_export_target_lost),
+                    Toast.LENGTH_LONG,
+                ).show()
+            } finally {
+                analysisImportIntoBusy = false
+                analysisImportIntoConversationId = null
+            }
+        }
+    }
+
     val conversationAnalysisExportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json"),
     ) { uri ->
@@ -1033,6 +1077,12 @@ fun AgentAppRoot(
             onConversationExport = exportConversation,
             onConversationDuplicate = duplicateConversation,
             onConversationAnalysisExport = exportConversationAnalysis,
+            onConversationAnalysisImportInto = { conversation ->
+                analysisImportIntoConversationId = conversation.id
+                runCatching {
+                    analysisImportIntoLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+                }.onFailure { analysisImportIntoConversationId = null }
+            },
             onOpenManageChats = { pushFromDrawer(AppRoute.ManageChats) },
             // 抽屉搜索与管理页的放大镜同一个目的地：跨会话全文搜索。
             onOpenDrawerSearch = { pushFromDrawer(AppRoute.MessageSearch()) },
@@ -2050,6 +2100,13 @@ fun AgentAppRoot(
     AgentPendingChildStopDialog(agentState.conversationPaneState.selectedConversationId)
 
     // 导出分析 JSON 是纯 IO（含图时几十秒），此前只有按钮防重，没有任何可见反馈。
+    if (analysisImportIntoBusy) {
+        io.github.mangi.eta.ui.components.WorkingDialog(
+            title = stringResource(R.string.analysis_importing_title),
+            message = stringResource(R.string.analysis_importing_message),
+        )
+    }
+
     if (conversationAnalysisExportBusy) {
         io.github.mangi.eta.ui.components.WorkingDialog(
             title = stringResource(R.string.analysis_exporting_title),
@@ -2444,3 +2501,6 @@ private data class ShellHomeState(
     val isStreaming: Boolean,
     val activeRunId: String?,
 )
+
+/** 会话内导入分析文件的体积上限（与备份页保持一致）。 */
+private const val ANALYSIS_IMPORT_MAX_BYTES = 64L * 1024 * 1024

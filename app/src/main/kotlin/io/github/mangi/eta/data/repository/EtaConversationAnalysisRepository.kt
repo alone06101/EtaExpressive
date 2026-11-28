@@ -343,6 +343,66 @@ internal object EtaConversationAnalysisRepository {
     }
 
     /**
+     * 把分析文件的内容导入到一个**已存在的空白会话**里，而不是新建一个。
+     *
+     * 用途：用户先建好会话（也许已经重命名、归好类），再从一个分析文件把内容搬进去。
+     * 因此会保留目标会话的 id / 标题 / 分类，只填充消息与模型历史。
+     *
+     * 安全边界：目标会话必须一条消息都没有。非空时直接返回 false —— 覆盖已有对话
+     * 是不可逆操作，不做「悄悄覆盖」这种默认行为。
+     *
+     * @return 是否导入成功
+     */
+    suspend fun importIntoConversation(
+        context: Context,
+        conversationId: String,
+        document: EtaConversationAnalysisDocument,
+    ): Boolean = withContext(Dispatchers.IO) {
+        val appContext = context.applicationContext
+        val dao = EtaDatabase.get(appContext).conversationDao()
+        val target = dao.conversationEntity(conversationId) ?: return@withContext false
+        if (dao.messagesForConversation(conversationId).isNotEmpty()) return@withContext false
+
+        require(document.messages.size <= MAX_IMPORTED_MESSAGES) {
+            "分析文件消息过多（${document.messages.size} 条，上限 $MAX_IMPORTED_MESSAGES）"
+        }
+        document.messages.firstOrNull { it.content.length > MAX_IMPORTED_MESSAGE_CHARS }?.let {
+            error("分析文件里有超长消息（超过 $MAX_IMPORTED_MESSAGE_CHARS 字符），已拒绝导入")
+        }
+
+        val appliedRunIds = document.conversation.appliedRuntimeRunIds.orEmpty()
+        val runIdRemap = appliedRunIds.associateWith { "run-${UUID.randomUUID()}" }
+        val messages = document.messages
+            .filter { it.type in IMPORTABLE_MESSAGE_TYPES }
+            .filterNot { message ->
+                message.type == "system_notice" &&
+                    message.content.trim() in DROPPED_SYSTEM_NOTICE_CODES
+            }
+            .mapIndexed { index, message -> message.toEntity(appContext, conversationId, index, runIdRemap) }
+        val checkpoint = document.history.takeIf { it.isNotEmpty() }?.let { history ->
+            runCatching {
+                ConversationContextCheckpointEntity(
+                    conversationId = conversationId,
+                    historyJson = encodeCheckpoint(history),
+                    cloudUsageJson = "",
+                )
+            }.onFailure {
+                AndroidAgentLogger.warn("analysis import-into: checkpoint dropped (${it.javaClass.simpleName})")
+            }.getOrNull()
+        }
+
+        val updated = target.copy(
+            historyJson = "[]",
+            appliedRuntimeRunIdsJson = encodeStringList(appliedRunIds.map { runIdRemap.getValue(it) }),
+            updatedAt = System.currentTimeMillis(),
+            hasCompletionMarker = false,
+        )
+        dao.upsertConversation(updated, messages, checkpoint)
+        true
+    }
+
+    /**
+     * 让用户决定导入会话用哪套绑定。    /**
      * 让用户决定导入会话用哪套绑定。
      *
      * 导入时默认不绑定（provider/model/assistant 留空，运行时回落到当前选择），

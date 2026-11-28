@@ -2648,6 +2648,29 @@ internal class AgentAppState(
      *
      * @return 是否至少沿用了一项；选择「使用当前的」或原绑定都不可用时返回 false
      */
+    /**
+     * 把分析文件导入到指定会话（仅限空白会话）。
+     *
+     * 与 [importConversationAnalysis] 的区别：不新建会话，保留目标会话的 id / 标题 / 分类，
+     * 只填充消息与模型历史。目标已有消息时抛错，由界面提示，不做覆盖。
+     */
+    suspend fun importAnalysisIntoConversation(conversationId: String, raw: String) =
+        withConversationArchive {
+            require(raw.length <= MAX_ANALYSIS_IMPORT_CHARS) {
+                "分析文件过大（${raw.length} 字符，上限 $MAX_ANALYSIS_IMPORT_CHARS）"
+            }
+            val document = EtaConversationAnalysisCodec.decode(raw)
+            val imported = EtaConversationAnalysisRepository.importIntoConversation(
+                appContext,
+                conversationId,
+                document,
+            )
+            if (!imported) {
+                error(appContext.getString(R.string.analysis_import_into_not_empty))
+            }
+            reloadConversationsAfterBackup()
+        }
+
     /** 用户关掉了绑定选择弹窗：保持导入时的默认（不绑定，回落到当前选择）。 */
     fun dismissImportedBindingDecision() {
         pendingImportedBindingId = null

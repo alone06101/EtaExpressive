@@ -263,6 +263,7 @@ fun ConversationSidePaneScaffold(
     onConversationExport: (ConversationSummaryUi) -> Unit = {},
     onConversationDuplicate: (ConversationSummaryUi) -> Unit = {},
     onConversationAnalysisExport: (ConversationSummaryUi) -> Unit = {},
+    onConversationAnalysisImportInto: (ConversationSummaryUi) -> Unit = {},
     onNewConversation: () -> Unit = {},
     onOpenSearchHistory: () -> Unit = {},
     onOpenManageChats: () -> Unit = {},
@@ -493,6 +494,7 @@ fun ConversationSidePaneScaffold(
                     onConversationExport = onConversationExport,
                     onConversationDuplicate = onConversationDuplicate,
                     onConversationAnalysisExport = onConversationAnalysisExport,
+                    onConversationAnalysisImportInto = onConversationAnalysisImportInto,
                     onOpenManageChats = onOpenManageChats,
                     onSelectFolder = onSelectFolder,
                     onRestoreConversation = onRestoreConversation,
@@ -706,6 +708,7 @@ private fun ConversationPanePanel(
     onConversationExport: (ConversationSummaryUi) -> Unit = {},
     onConversationDuplicate: (ConversationSummaryUi) -> Unit = {},
     onConversationAnalysisExport: (ConversationSummaryUi) -> Unit = {},
+    onConversationAnalysisImportInto: (ConversationSummaryUi) -> Unit = {},
     onOpenManageChats: () -> Unit = {},
     onSelectFolder: (String?) -> Unit = {},
     onRestoreConversation: (String) -> Unit = {},
@@ -745,6 +748,7 @@ private fun ConversationPanePanel(
         onConversationExport = onConversationExport,
         onConversationDuplicate = onConversationDuplicate,
         onConversationAnalysisExport = onConversationAnalysisExport,
+        onConversationAnalysisImportInto = onConversationAnalysisImportInto,
         onOpenManageChats = onOpenManageChats,
         onSelectFolder = onSelectFolder,
         onRestoreConversation = onRestoreConversation,
@@ -829,6 +833,7 @@ private fun Material3ConversationPane(
     onConversationExport: (ConversationSummaryUi) -> Unit,
     onConversationDuplicate: (ConversationSummaryUi) -> Unit,
     onConversationAnalysisExport: (ConversationSummaryUi) -> Unit,
+    onConversationAnalysisImportInto: (ConversationSummaryUi) -> Unit,
     onOpenManageChats: () -> Unit,
     onSelectFolder: (String?) -> Unit,
     onRestoreConversation: (String) -> Unit = {},
@@ -1046,6 +1051,7 @@ private fun Material3ConversationPane(
                                     onExport = { onConversationExport(conversation) },
                                     onDuplicate = { onConversationDuplicate(conversation) },
                                     onExportAnalysis = { onConversationAnalysisExport(conversation) },
+                                    onImportAnalysisInto = { onConversationAnalysisImportInto(conversation) },
                                     // 官方 animateItem：删除/移动文件夹淡出、置顶跨组 = 同 key
                                     // 换位弹簧（分组各自 itemsIndexed 共用同一 key 空间）；
                                     // 入场不播动画，避免抽屉首开全列表闪淡入。
@@ -1427,6 +1433,7 @@ private fun Material3ConversationRow(
     onExport: () -> Unit,
     onDuplicate: () -> Unit,
     onExportAnalysis: () -> Unit,
+    onImportAnalysisInto: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var showActionMenu by remember { mutableStateOf(false) }
@@ -1566,7 +1573,11 @@ private fun Material3ConversationRow(
                         // 调度台是系统条目：显示名固定，但重命名仍改真实标题；取消置顶、
                         // 移动到分类与删除入口不提供（分类归属是普通会话的整理属性）。
                         val systemEntry = conversation.isDispatchConsole
-                        val actionCount = if (systemEntry) 4 else 7
+                        val actionCount = when {
+                            systemEntry -> 4
+                            conversation.preview.isBlank() -> 8
+                            else -> 7
+                        }
                         var actionIndex = 0
                         DrawerActionMenuItem(
                             index = actionIndex++,
@@ -1623,6 +1634,19 @@ private fun Material3ConversationRow(
                                 onExportAnalysis()
                             },
                         )
+                        // 只有空白会话才提供「导入到此会话」：非空时导入会覆盖对话，不做默认可选。
+                        if (conversation.preview.isBlank() && !systemEntry) {
+                            DrawerActionMenuItem(
+                                index = actionIndex++,
+                                count = actionCount,
+                                text = stringResource(R.string.action_import_analysis_into),
+                                icon = Icons.Rounded.FileDownload,
+                                onClick = {
+                                    showActionMenu = false
+                                    onImportAnalysisInto()
+                                },
+                            )
+                        }
                         if (!systemEntry) {
                             DrawerActionMenuItem(
                                 index = actionIndex++,

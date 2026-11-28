@@ -2316,6 +2316,8 @@
   <string name="analysis_importing_message">正在解析分析檔案並寫入新會話，請稍候</string>
   <string name="analysis_exporting_title">正在匯出</string>
   <string name="analysis_exporting_message">正在產生分析檔案，會話較大時需要一會兒</string>
+  <string name="analysis_import_into_not_empty">目標會話已有內容，只能匯入到空白會話</string>
+  <string name="action_import_analysis_into">匯入分析檔案到此會話</string>
   <string name="provider_system_prompt_title">系統提示詞</string>
   <string name="provider_system_prompt_label">系統提示詞</string>
   <string name="provider_system_prompt_summary">留空則不注入。助手的「跟隨服務商」開啟且此處有內容時，執行時優先使用它，助手人格與能力塊追加在其後。</string>
