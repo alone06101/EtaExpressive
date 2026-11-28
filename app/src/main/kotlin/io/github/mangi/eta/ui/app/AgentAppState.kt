@@ -373,6 +373,35 @@ internal class AgentAppState(
 
     /** 启动期运行恢复的兜底超时：卡住时释放归档锁，不让导入/导出被永久拒绝。 */
     private val STARTUP_RECOVERY_TIMEOUT_MS = 30_000L
+
+    /** 单次恢复泵的超时：超过它说明恢复内部卡住，直接放弃这一轮。 */
+    private val RUNTIME_RECOVERY_TIMEOUT_MS = 20_000L
+
+    /** 看门狗：任何情况下持锁超过这个时长都强制释放（真机上曾出现永久持锁）。 */
+    private val RUNTIME_RECOVERY_WATCHDOG_MS = 60_000L
+
+    /**
+     * 获取运行恢复锁，并启动看门狗。
+     *
+     * 锁只在 finally 里释放，一旦恢复内部的挂起点永不返回（等待运行服务、读归档事件），
+     * 标志就永久为 true：之后导入分析文件、导出、恢复备份全部被拒，用户看到的是
+     * 「正在恢复上次运行」反复出现。看门狗是最后一道保险，宁可让一次恢复并发，
+     * 也不要把这些操作永久锁死。
+     */
+    private fun acquireRuntimeRecovery(): Boolean {
+        if (!runtimeRecoveryInProgress.compareAndSet(false, true)) return false
+        scope.launch(Dispatchers.IO) {
+            kotlinx.coroutines.delay(RUNTIME_RECOVERY_WATCHDOG_MS)
+            if (runtimeRecoveryInProgress.get()) {
+                AndroidAgentLogger.warn(
+                    "runtime recovery held the lock for " + RUNTIME_RECOVERY_WATCHDOG_MS +
+                        "ms; forcing release so archive operations stay usable",
+                )
+                runtimeRecoveryInProgress.set(false)
+            }
+        }
+        return true
+    }
     /** 恢复进行中又来了新请求：不丢弃、合并成「跑完再来一遍」。 */
     private val runtimeRefreshPending = AtomicBoolean(false)
     // Main-thread cursor: bounded recovery passes rotate rather than dropping older owners.
@@ -1862,7 +1891,7 @@ internal class AgentAppState(
                 refreshRequestOverhead()
             }
         }
-        runtimeRecoveryInProgress.set(true)
+        acquireRuntimeRecovery()
         scope.launch(Dispatchers.IO) {
             try {
                 // This runs at construction, when conversationsById is still the
@@ -2304,8 +2333,9 @@ internal class AgentAppState(
      * 归档刚写完、恢复刚好还在跑，这一次通告就白发了，内容要等到下一次切前台才出现。
      */
     private fun pumpRuntimeRecovery() {
-        if (!runtimeRecoveryInProgress.compareAndSet(false, true)) return
+        if (!acquireRuntimeRecovery()) return
         scope.launch(Dispatchers.IO) {
+            var timedOut = false
             try {
                 while (runtimeRefreshPending.compareAndSet(true, false)) {
                     // 归档必须先于 outbox 折叠：外部入口（系统语音浮窗、小爱、Breeno）的 run 同时留下
@@ -2314,13 +2344,27 @@ internal class AgentAppState(
                     // 因 alreadyImported（assistant-$runId-1 且非 streaming）直接早退并被删掉，
                     // 中间过程永久丢失。反过来先导入归档，recover 的 history reducer 会判 alreadyApplied
                     // 而只做收尾，不重复追加。
-                    importArchivedExternalRuns()
-                    recoverRuntimeRuns()
+                    val finished = withTimeoutOrNull(RUNTIME_RECOVERY_TIMEOUT_MS) {
+                        importArchivedExternalRuns()
+                        recoverRuntimeRuns()
+                        true
+                    }
+                    if (finished == null) {
+                        // 卡住时丢弃这一轮：继续 while 只会一轮轮超时，并让锁看起来永远被占。
+                        AndroidAgentLogger.warn(
+                            "runtime recovery泵超时（" + RUNTIME_RECOVERY_TIMEOUT_MS +
+                                "ms），丢弃本次刷新请求",
+                        )
+                        runtimeRefreshPending.set(false)
+                        timedOut = true
+                        break
+                    }
                 }
             } finally {
                 runtimeRecoveryInProgress.set(false)
                 // 关闸那一刻进来并撞上 CAS 的请求：再泵一次，否则它要等下一次外部触发。
-                if (runtimeRefreshPending.get()) pumpRuntimeRecovery()
+                // 超时的情况下不再重泵：那会立刻把锁再拿走一轮，用户看到的还是「正在恢复」。
+                if (!timedOut && runtimeRefreshPending.get()) pumpRuntimeRecovery()
             }
         }
     }
