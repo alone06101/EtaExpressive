@@ -116,9 +116,10 @@ jobs:
           ETA_RELEASE_STORE_PASSWORD: ${{ secrets.ETA_RELEASE_STORE_PASSWORD }}
           ETA_RELEASE_KEY_ALIAS: ${{ secrets.ETA_RELEASE_KEY_ALIAS }}
           ETA_RELEASE_KEY_PASSWORD: ${{ secrets.ETA_RELEASE_KEY_PASSWORD }}
-        run: >-
-          ./gradlew --no-daemon --no-configuration-cache
-          :app:assembleRelease
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --no-configuration-cache \
+            :app:assembleRelease 2>&1 | tee gradle-build.log
 
       - name: 验证 APK 签名与版本
         id: apk
@@ -154,6 +155,18 @@ jobs:
           archive: false
           if-no-files-found: error
           retention-days: 14
+
+      # 失败时自动判定是否属于环境性失败（依赖/插件下载），避免为外部网络问题改代码。
+      - name: 失败诊断
+        if: failure()
+        run: |
+          echo "## 失败诊断" >> "$GITHUB_STEP_SUMMARY"
+          if grep -qE "Could not download|Could not resolve all files|Failed to fetch maven artifact|was not found in any of the following sources|Read timed out|Connection reset" gradle-build.log 2>/dev/null; then
+            echo "命中依赖/插件下载特征：**环境性失败，直接重跑本次 job，不要改代码。**" >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::疑似依赖或插件下载失败（环境性），建议重跑本 job，无需改代码。"
+          else
+            echo "未见依赖下载特征：按日志定位（编译 / 断言 / 契约测试）。" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: 创建 Release
         env:

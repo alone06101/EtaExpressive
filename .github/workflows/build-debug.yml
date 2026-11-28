@@ -79,7 +79,9 @@ jobs:
 
       - name: 运行单元测试
         timeout-minutes: 12
-        run: python3 -u .github/scripts/run_unit_tests.py
+        run: |
+          set -o pipefail
+          python3 -u .github/scripts/run_unit_tests.py 2>&1 | tee unit-tests.log
 
       - name: 上传单测报告
         if: always()
@@ -99,9 +101,10 @@ jobs:
           ETA_RELEASE_STORE_PASSWORD: ${{ secrets.ETA_RELEASE_STORE_PASSWORD }}
           ETA_RELEASE_KEY_ALIAS: ${{ secrets.ETA_RELEASE_KEY_ALIAS }}
           ETA_RELEASE_KEY_PASSWORD: ${{ secrets.ETA_RELEASE_KEY_PASSWORD }}
-        run: >-
-          ./gradlew --no-daemon --no-configuration-cache
-          :app:assembleRelease
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --no-configuration-cache \
+            :app:assembleRelease 2>&1 | tee gradle-build.log
 
       - name: 校验 APK 原签名
         run: |
@@ -127,6 +130,17 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      # 失败时自动判定是否属于环境性失败（依赖/插件下载），避免为外部网络问题去改代码。
+      - name: 失败诊断
+        if: failure()
+        run: |
+          echo "## 失败诊断" >> "$GITHUB_STEP_SUMMARY"
+          if grep -qE "Could not download|Could not resolve all files|Failed to fetch maven artifact|was not found in any of the following sources|Read timed out|Connection reset" unit-tests.log gradle-build.log 2>/dev/null; then
+            echo "命中依赖/插件下载特征：**环境性失败，直接重跑本次 job，不要改代码。**" >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::疑似依赖或插件下载失败（环境性），建议重跑本 job，无需改代码。"
+          else
+            echo "未见依赖下载特征：按日志定位（编译 / 断言 / 契约测试）。" >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: 上传 Release 混淆映射
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
