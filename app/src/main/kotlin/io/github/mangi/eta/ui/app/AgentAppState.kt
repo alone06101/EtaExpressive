@@ -9171,6 +9171,7 @@ internal class AgentAppState(
                     isPinned = id in conversationPinned,
                     isActiveRun = state.isStreaming && !state.isPaused,
                     hasCompletionMarker = id in conversationCompletionMarkers,
+                    isEmptyConversation = lastMessage == null,
                     isWaitingQuestion = id in conversationWaitingQuestionIds,
                     isDispatchConsole = id == consoleId,
                     folderId = conversationFolderIds[id],

@@ -2,6 +2,7 @@ package io.github.mangi.eta.agent.skill
 
 import android.content.Context
 import android.content.res.AssetManager
+import io.github.mangi.eta.core.AndroidAgentLogger
 import io.github.mangi.eta.data.db.EtaDatabase
 import io.github.mangi.eta.data.model.AssistantStorage
 import io.github.mangi.eta.data.db.SkillRegistryEntity
@@ -725,17 +726,28 @@ object SkillRuntime {
     private fun revokeRunSkills(context: Context, assistantId: String, enabled: Set<String>) {
         val runs = File(assistantSkillsDirectory(context, assistantId), ".runs")
         runs.listFiles().orEmpty().forEach { run ->
-            File(run, "skills").listFiles().orEmpty().filter { it.name !in enabled }.forEach {
-                check(deleteSkillPathWithoutFollowingLinks(skillsRoot(context), it)) { "无法撤销技能目录" }
-            }
+            // 撤销失败只是「这次没删掉」，与安全边界无关（越界路径在删除函数内部已拒绝）。
+            // 原本用 check() 把可恢复的清理失败升级成进程崩溃：真机表现为打开会话随机闪退，
+            // 异常消息只有一句「无法撤销技能目录」。
+            File(run, "skills").listFiles().orEmpty()
+                .filter { it.name !in enabled }
+                .forEach {
+                    if (!deleteSkillPathWithoutFollowingLinks(skillsRoot(context), it)) {
+                        AndroidAgentLogger.warn("skill revoke skipped: " + it.name)
+                    }
+                }
         }
     }
 
     fun pruneRunSkills(context: Context, root: File, allowed: Set<String>) =
         SkillMutationLock.withLock(skillsRoot(context)) {
-            root.listFiles().orEmpty().filter { it.name !in allowed }.forEach {
-                check(deleteSkillPathWithoutFollowingLinks(skillsRoot(context), it)) { "无法撤销技能目录" }
-            }
+            root.listFiles().orEmpty()
+                .filter { it.name !in allowed }
+                .forEach {
+                    if (!deleteSkillPathWithoutFollowingLinks(skillsRoot(context), it)) {
+                        AndroidAgentLogger.warn("skill prune skipped: " + it.name)
+                    }
+                }
         }
 
     private fun publishSkillView(context: Context, assistantId: String, entries: List<SkillIndexEntry>, view: File): List<SkillIndexEntry> {

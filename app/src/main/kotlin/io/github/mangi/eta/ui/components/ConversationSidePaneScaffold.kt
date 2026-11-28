@@ -1576,7 +1576,7 @@ private fun Material3ConversationRow(
                         val systemEntry = conversation.isDispatchConsole
                         val actionCount = when {
                             systemEntry -> 4
-                            conversation.preview.isBlank() -> 8
+                            conversation.isEmptyConversation -> 8
                             else -> 7
                         }
                         var actionIndex = 0
@@ -1636,7 +1636,7 @@ private fun Material3ConversationRow(
                             },
                         )
                         // 只有空白会话才提供「导入到此会话」：非空时导入会覆盖对话，不做默认可选。
-                        if (conversation.preview.isBlank() && !systemEntry) {
+                        if (conversation.isEmptyConversation && !systemEntry) {
                             DrawerActionMenuItem(
                                 index = actionIndex++,
                                 count = actionCount,

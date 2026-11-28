@@ -45,6 +45,13 @@ data class ConversationSummaryUi(
     val isPinned: Boolean = false,
     val isActiveRun: Boolean = false,
     val hasCompletionMarker: Boolean = false,
+    /**
+     * 该会话还没有任何消息。
+     *
+     * 不能用 preview.isBlank() 判断：空白会话的 preview 是「暂无消息」这类文案，
+     * 永远非空，按它判断会让「导入到此会话」的入口永远不出现。
+     */
+    val isEmptyConversation: Boolean = false,
     /** 派发子会话正在等待用户回答提问（ask_user）：抽屉行尾显示等待标记，回答/终态即清。 */
     val isWaitingQuestion: Boolean = false,
     /** 该会话由调度台所建或接续使用中；抽屉行前显示派生标记。 */
