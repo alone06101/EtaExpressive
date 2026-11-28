@@ -101,6 +101,7 @@ import io.github.mangi.eta.data.repository.AgentMemoryRepository
 import io.github.mangi.eta.data.repository.EtaBackupExportOptions
 import io.github.mangi.eta.data.repository.AgentConversationHistoryFiles
 import io.github.mangi.eta.data.repository.CapabilityAssistRouter
+import io.github.mangi.eta.data.repository.EtaConversationAnalysisDocument
 import io.github.mangi.eta.data.repository.ConversationDuplicateRepository
 import io.github.mangi.eta.data.repository.EtaBackupRepository
 import io.github.mangi.eta.data.repository.EtaBackupSummary

@@ -7,6 +7,7 @@ import io.github.mangi.eta.agent.media.AgentToolMediaPreviews
 import io.github.mangi.eta.agent.model.AgentContextBudget
 import io.github.mangi.eta.agent.model.AgentConversationCodec
 import io.github.mangi.eta.agent.media.AgentChatImageCache
+import io.github.mangi.eta.core.AndroidAgentLogger
 import io.github.mangi.eta.agent.media.MAX_AGENT_IMAGE_BYTES
 import io.github.mangi.eta.agent.media.MAX_AGENT_VIDEO_BYTES
 import io.github.mangi.eta.agent.model.AgentModelClient
