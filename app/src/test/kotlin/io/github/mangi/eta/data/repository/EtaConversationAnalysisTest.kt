@@ -327,7 +327,9 @@ class EtaConversationAnalysisTest {
         // 应用过的运行 id 被重映射成新值后跟着走：回合切分靠它解析消息 id，
         // 且新值不会撞导出设备库里已有的 runId。
         assertTrue(conversation.appliedRuntimeRunIdsJson != "[]")
-        assertTrue(!conversation.appliedRuntimeRunIdsJson.contains("run-1"))
+        // 带引号做精确匹配：重映射值是 "run-" + UUID，UUID 首字符若是 1，
+        // 结果就是 run-1abc...，裸 contains("run-1") 会把它当成「原 id 还在」而假失败。
+        assertFalse(conversation.appliedRuntimeRunIdsJson.contains("\"run-1\""))
 
         val restored = dao.messagesForConversation(newId)
         assertEquals(4, restored.size)
