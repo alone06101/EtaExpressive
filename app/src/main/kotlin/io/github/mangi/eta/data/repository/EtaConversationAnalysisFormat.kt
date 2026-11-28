@@ -357,7 +357,7 @@ internal object EtaConversationAnalysisCodec {
         FORMAT_SIGNATURE.containsMatchIn(raw.take(LOOKS_LIKE_PREFIX_CHARS))
 
     /** 超过约 8 百万字符时提示体积；阈值按真实序列化结果判断，不按消息条数猜。 */
-    private const val SIZE_WARNING_CHARS = 8_000_000
+    private const val SIZE_WARNING_CHARS = 32_000_000
 
     /** 分流只看开头这么多字符，避免对超大文件做整串正则扫描。 */
     private const val LOOKS_LIKE_PREFIX_CHARS = 4096

@@ -607,8 +607,8 @@ internal object EtaConversationAnalysisRepository {
     private const val ARCHIVE_EVENT_PAGE_SIZE = 64
 
     /** 单次导入允许的最大消息条数：超出通常意味着文件被构造过，而不是真实会话。 */
-    private const val MAX_IMPORTED_MESSAGES = 20_000
+    private const val MAX_IMPORTED_MESSAGES = 100_000
 
     /** 单条消息正文上限；超过它会让单行写入异常巨大，也拖垮后续渲染。 */
-    private const val MAX_IMPORTED_MESSAGE_CHARS = 4_000_000
+    private const val MAX_IMPORTED_MESSAGE_CHARS = 16_000_000
 }

@@ -238,7 +238,10 @@ internal fun DataBackupScreen(
                                 context.getString(R.string.conversation_analysis_file_too_large)
                             }
                         }
-                        buffer.toByteArray().toString(Charsets.UTF_8)
+                        // 直接按字节解码：toByteArray() 会先复制整份再转 String，
+                        // 大文件时这一份拷贝正好是压垮内存的那一份。
+                        @Suppress("DEPRECATION")
+                        buffer.toString(Charsets.UTF_8.name())
                     }
                 }
                 onImportAnalysis(raw)
@@ -647,4 +650,4 @@ private fun backupMessage(context: Context, base: String, modelCountRes: Int, mo
     if (modelCount > 0) base + "\n" + context.getString(modelCountRes, modelCount) else base
 
 /** 分析 JSON 的硬上限：读进内存的是 UTF-16 字符串，实际占用约两倍于此。 */
-private const val MAX_ANALYSIS_FILE_BYTES = 24 * 1024 * 1024L
+private const val MAX_ANALYSIS_FILE_BYTES = 64 * 1024 * 1024L

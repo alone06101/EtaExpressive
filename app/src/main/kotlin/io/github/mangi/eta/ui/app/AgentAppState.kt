@@ -2582,8 +2582,8 @@ internal class AgentAppState(
      * 走与「导入会话分析」同一条链路（导出 → 导入为新会话），再回写同机副本应有的
      * provider/model/assistant/folder 与标题后缀；完成后重载会话列表，副本立刻可见。
      */
-    /** 单次分析导入允许的最大字符数（约 24M 字符 ≈ 48MB UTF-16 常驻）。 */
-    private val MAX_ANALYSIS_IMPORT_CHARS = 24_000_000
+    /** 单次分析导入允许的最大字符数（64M 字符 ≈ 128MB UTF-16 常驻）。 */
+    private val MAX_ANALYSIS_IMPORT_CHARS = 64_000_000
 
     suspend fun duplicateConversation(conversationId: String, titleSuffix: String): String =
         withConversationArchive(requireIdleRuns = false) {
