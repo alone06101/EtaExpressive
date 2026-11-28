@@ -2334,6 +2334,10 @@
   <string name="import_binding_keep">Keep the exported ones</string>
   <string name="import_binding_current">Use the current ones</string>
   <string name="import_binding_unavailable">The exported model or assistant is not available on this device; the current selection is used</string>
+  <string name="analysis_importing_title">Importing</string>
+  <string name="analysis_importing_message">Parsing the analysis file and creating a new conversation. Please wait.</string>
+  <string name="analysis_exporting_title">Exporting</string>
+  <string name="analysis_exporting_message">Generating the analysis file. Large conversations may take a while.</string>
   <string name="provider_system_prompt_title">System prompt</string>
   <string name="provider_system_prompt_label">System prompt</string>
   <string name="provider_system_prompt_summary">Leave blank to skip. When the assistant follows the provider and this is filled, the runtime uses it as the base prompt and appends the personality and capability blocks after it.</string>

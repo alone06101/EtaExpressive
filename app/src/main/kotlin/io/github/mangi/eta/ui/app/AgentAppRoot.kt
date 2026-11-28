@@ -2049,6 +2049,14 @@ fun AgentAppRoot(
 
     AgentPendingChildStopDialog(agentState.conversationPaneState.selectedConversationId)
 
+    // 导出分析 JSON 是纯 IO（含图时几十秒），此前只有按钮防重，没有任何可见反馈。
+    if (conversationAnalysisExportBusy) {
+        io.github.mangi.eta.ui.components.WorkingDialog(
+            title = stringResource(R.string.analysis_exporting_title),
+            message = stringResource(R.string.analysis_exporting_message),
+        )
+    }
+
     conversationRenameTarget?.let { conversation ->
         var renameInput by remember(conversation.id) { mutableStateOf(conversation.title) }
         EtaDialog(

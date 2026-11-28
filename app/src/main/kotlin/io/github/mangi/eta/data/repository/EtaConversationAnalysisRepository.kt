@@ -48,6 +48,23 @@ internal object EtaConversationAnalysisRepository {
     private val traceFormatter = AgentTraceFormatter()
 
     /**
+     * system_notice 里属于「运行状态」的 code，导入时丢弃。
+     *
+     * 这些通知的 content 存的就是 wireValue，而 AgentConversationStore 反序列化时会把
+     * runtime_failed 还原成 ErrorReconnectMessageUi(Failed)：一旦它成为会话的最后一条，
+     * canContinueDisconnectedRun 就判定「可继续断连运行」，用户看到的是导入后一直提示
+     * 重连失败。同理 stopped / model_retry / interrupted 也是上一次运行的状态残留。
+     *
+     * 只保留信息类通知（完成、降级说明、空结果），它们描述的是会话内容。
+     */
+    private val DROPPED_SYSTEM_NOTICE_CODES = setOf(
+        "runtime_failed",
+        "stopped",
+        "model_retry",
+        "interrupted",
+    )
+
+    /**
      * 应用认识的会话消息类型；其余类型在导入时直接丢弃。
      *
      * 刻意不含 error_reconnect：它记录的是「当时那一次运行失败/被重连」，
@@ -301,6 +318,10 @@ internal object EtaConversationAnalysisRepository {
         }
         val messages = document.messages
             .filter { it.type in IMPORTABLE_MESSAGE_TYPES }
+            .filterNot { message ->
+                message.type == "system_notice" &&
+                    message.content.trim() in DROPPED_SYSTEM_NOTICE_CODES
+            }
             .mapIndexed { index, message -> message.toEntity(appContext, id, index, runIdRemap) }
         // 超大会话的 checkpoint 可能即使去掉 turn 保护后仍然超限：此时丢的是「模型侧历史」，
         // 消息本体照样导入，比整次导入失败更合理。

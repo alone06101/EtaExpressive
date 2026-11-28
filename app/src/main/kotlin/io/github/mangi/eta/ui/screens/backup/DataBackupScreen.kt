@@ -33,6 +33,7 @@ import io.github.mangi.eta.data.repository.EtaBackupRepository
 import io.github.mangi.eta.data.repository.EtaBackupSummary
 import io.github.mangi.eta.data.repository.EtaModelBackupSummary
 import io.github.mangi.eta.agent.tool.ToolRecipePaths
+import io.github.mangi.eta.ui.components.WorkingDialog
 import io.github.mangi.eta.ui.adaptive.EtaDialog
 import io.github.mangi.eta.ui.adaptive.EtaDialogActions
 import io.github.mangi.eta.ui.adaptive.EtaDimens
@@ -552,6 +553,14 @@ internal fun DataBackupScreen(
                 )
             },
         ) {
+        }
+
+        // 导入是纯 IO，可能持续数十秒（含图更久）：给出明确进度，且不允许中途取消。
+        if (importingAnalysis) {
+            WorkingDialog(
+                title = stringResource(R.string.analysis_importing_title),
+                message = stringResource(R.string.analysis_importing_message),
+            )
         }
 
         // 导入完成后让用户选：沿用导出时的模型与助手，还是使用当前的选择。

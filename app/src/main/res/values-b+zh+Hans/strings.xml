@@ -2202,6 +2202,10 @@
   <string name="import_binding_keep">沿用导出时的</string>
   <string name="import_binding_current">使用当前的</string>
   <string name="import_binding_unavailable">导出时的模型或助手在本机不存在，已使用当前选择</string>
+  <string name="analysis_importing_title">正在导入</string>
+  <string name="analysis_importing_message">正在解析分析文件并写入新会话，请稍候</string>
+  <string name="analysis_exporting_title">正在导出</string>
+  <string name="analysis_exporting_message">正在生成分析文件，会话较大时需要一会儿</string>
   <string name="provider_system_prompt_title">系统提示词</string>
   <string name="provider_system_prompt_label">系统提示词</string>
   <string name="provider_system_prompt_summary">留空则不注入。助手的「跟随服务商」打开且此处有内容时，运行时优先使用它，助手人格与能力块追加在其后。</string>
