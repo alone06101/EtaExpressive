@@ -74,6 +74,16 @@ internal interface ConversationDao {
         "model_id = :modelId, assistant_id = :assistantId, folder_id = :folderId, " +
         "updated_at = :updatedAt WHERE id = :id"
     )
+    suspend fun updateCloneMetadata(
+        id: String,
+        title: String,
+        providerId: String,
+        modelId: String,
+        assistantId: String,
+        folderId: String,
+        updatedAt: Long,
+    )
+
     /**
      * 写入导入会话的绑定选择。
      *
@@ -86,16 +96,6 @@ internal interface ConversationDao {
     )
     suspend fun updateImportedBinding(
         id: String,
-        providerId: String,
-        modelId: String,
-        assistantId: String,
-        folderId: String,
-        updatedAt: Long,
-    )
-
-    suspend fun updateCloneMetadata(
-        id: String,
-        title: String,
         providerId: String,
         modelId: String,
         assistantId: String,
