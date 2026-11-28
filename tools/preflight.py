@@ -204,6 +204,47 @@ def check_strings_locales():
             problems.append(name + ' 多出 ' + str(len(only_locale)) + ' 个 key，例如：' + ', '.join(sorted(only_locale)[:5]))
 
 
+def check_icon_imports(path):
+    """
+    用到的 Icons.Rounded.X 必须已 import。
+
+    图标是按名称单独引入的（androidx.compose.material.icons.rounded.X），
+    换图标时很容易只改用法、忘了改 import，编译期才报 Unresolved reference。
+    """
+    text = read(path)
+    for match in re.finditer(r'Icons\.(Rounded|Filled|Outlined|AutoMirrored\.\w+)\.(\w+)', text):
+        family = match.group(1)
+        name = match.group(2)
+        if family.startswith('AutoMirrored'):
+            # AutoMirrored 的包路径是全小写的 icons.automirrored.<style>.<Name>
+            style = family.split('.')[1].lower()
+            prefix = 'androidx.compose.material.icons.automirrored.' + style + '.'
+            expected = 'import ' + prefix + name
+        else:
+            prefix = 'androidx.compose.material.icons.' + family.lower() + '.'
+            expected = 'import ' + prefix + name
+        # 通配符 import 也算已引入
+        if 'import ' + prefix + '*' in text:
+            continue
+        if expected in text:
+            continue
+        problems.append(path + ' 使用了 Icons.' + family + '.' + name + ' 但缺少 import：' + expected)
+
+
+def check_known_symbol_usage(path):
+    """known symbol 与 withContext 这类高频协程符号的使用检查。"""
+    text = read(path)
+    if 'withContext(' not in text:
+        return
+    if 'import kotlinx.coroutines.withContext' in text:
+        return
+    if 'import kotlinx.coroutines.*' in text:
+        return
+    if 'kotlinx.coroutines.withContext' in text:
+        return
+    problems.append(path + ' 使用了 withContext 但缺少 import：import kotlinx.coroutines.withContext')
+
+
 def main():
     for path in sorted(glob.glob('app/src/main/kotlin/**/*Dao.kt', recursive=True)):
         check_dao_annotation_pairs(path)
@@ -212,6 +253,8 @@ def main():
         check_imports(path)
         check_comment_delimiters_in_strings(path)
         check_doc_comment_integrity(path)
+        check_icon_imports(path)
+        check_known_symbol_usage(path)
     check_strings_locales()
 
     for item in warnings:
