@@ -145,6 +145,37 @@ def check_comment_delimiters_in_strings(path):
                 break
 
 
+def check_doc_comment_integrity(path):
+    """
+    注释内部又出现注释开头，通常意味着「代码被插进了注释与声明之间」。
+
+    这个形态在本仓库已经造成过三次事故：新方法被插到上一个成员的文档注释与它
+    自己的声明之间，于是注释被拆成两段、中间那段正文变成游离代码，编译期以
+    「private 成员 Unresolved」这种完全无关的形式报错。
+    """
+    marker = '/' + '*'
+    closing = '*' + '/'
+    for index, line in enumerate(read(path).split(chr(10)), 1):
+        stripped = line.strip()
+        if not stripped.startswith(marker):
+            continue
+        rest = stripped[len(marker):]
+        if marker in rest:
+            problems.append(
+                path + ':' + str(index + 1) + ' 注释内部又出现注释开头（疑似代码被插进注释与声明之间）')
+    for index, line in enumerate(read(path).split(chr(10)), 1):
+        stripped = line.strip()
+        if not stripped.startswith('*'):
+            continue
+        opens = stripped.count(marker)
+        closes = stripped.count(closing)
+        # 注释正文里成对引用的写法（例如上游文档里的 /* 40.dp */）是正当用法，
+        # 只有不成对的开头才说明这段注释被拆坏了。
+        if opens > closes:
+            problems.append(
+                path + ':' + str(index + 1) + ' 注释正文里出现未闭合的注释开头（疑似注释被拆开）')
+
+
 def check_strings_locales():
     paths = {
         'en': 'app/src/main/res/values/strings.xml',
@@ -180,6 +211,7 @@ def main():
     for path in sorted(glob.glob('app/src/main/kotlin/**/*.kt', recursive=True)):
         check_imports(path)
         check_comment_delimiters_in_strings(path)
+        check_doc_comment_integrity(path)
     check_strings_locales()
 
     for item in warnings:
