@@ -7,6 +7,7 @@ import io.github.mangi.eta.data.db.ConversationMessageEntity
 import io.github.mangi.eta.data.db.EtaDatabase
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -449,6 +450,114 @@ class EtaConversationAnalysisTest {
         val file = AgentConversationHistoryFiles.file(context, conversationId)
         file.parentFile?.mkdirs()
         file.writeText(json, Charsets.UTF_8)
+    }
+
+    @Test
+    fun importIntoAnEmptyConversationFillsItAndKeepsItsIdentity() = runBlocking {
+        val dao = EtaDatabase.get(context).conversationDao()
+        // 目标：一个已建好、已归类的空白会话。
+        dao.insertConversations(
+            listOf(
+                ConversationEntity(
+                    id = "target-empty",
+                    title = "我自己命名的会话",
+                    thinkingEnabled = false,
+                    appliedRuntimeRunIdsJson = "[]",
+                    createdAt = 1,
+                    updatedAt = 2,
+                    folderId = "folder-1",
+                ),
+            ),
+        )
+        val document = EtaConversationAnalysisDocument(
+            exportedAt = 1,
+            conversation = EtaConversationAnalysisConversation(
+                id = "source-conv",
+                title = "导出时的标题",
+                createdAt = 1,
+                updatedAt = 1,
+                providerId = "provider-x",
+                modelId = "model-x",
+            ),
+            messages = listOf(
+                message("m-1", 0, "user", "问题"),
+                message("m-2", 1, "assistant", "回答"),
+            ),
+        )
+
+        val imported = EtaConversationAnalysisRepository.importIntoConversation(
+            context,
+            "target-empty",
+            document,
+        )
+
+        assertTrue(imported)
+        val target = dao.conversationEntity("target-empty")
+        assertNotNull(target)
+        // 保留目标会话的身份：标题与分类不被导出文件覆盖。
+        assertEquals("我自己命名的会话", target!!.title)
+        assertEquals("folder-1", target.folderId)
+        // 绑定不跟着走，回落到当前选择。
+        assertEquals("", target.providerId)
+        val restored = dao.messagesForConversation("target-empty")
+        assertEquals(listOf("user", "assistant"), restored.map { it.type })
+        assertEquals(listOf(0, 1), restored.map { it.sortIndex })
+    }
+
+    @Test
+    fun importIntoANonEmptyConversationIsRefusedAndLeavesItUntouched() = runBlocking {
+        seedConversationWithoutCheckpoint()
+        val dao = EtaDatabase.get(context).conversationDao()
+        val before = dao.messagesForConversation("conv-2").map { it.id }
+        val document = EtaConversationAnalysisDocument(
+            exportedAt = 1,
+            conversation = EtaConversationAnalysisConversation(
+                id = "source-conv",
+                title = "导出时的标题",
+                createdAt = 1,
+                updatedAt = 1,
+            ),
+            messages = listOf(message("m-1", 0, "user", "不该写进去")),
+        )
+
+        val imported = EtaConversationAnalysisRepository.importIntoConversation(
+            context,
+            "conv-2",
+            document,
+        )
+
+        assertFalse(imported)
+        assertEquals(before, dao.messagesForConversation("conv-2").map { it.id })
+        assertEquals("没有检查点", dao.conversationEntity("conv-2")!!.title)
+    }
+
+    @Test
+    fun importDropsRuntimeStateNoticesSoTheNewChatIsNotStuckWaiting() = runBlocking {
+        // runtime_failed 在反序列化时会被还原成「重连失败」条目，
+        // 一旦它成为最后一条，新会话一打开就处于「可继续断连运行」。
+        val document = EtaConversationAnalysisDocument(
+            exportedAt = 1,
+            conversation = EtaConversationAnalysisConversation(
+                id = "source-conv",
+                title = "带失败记录",
+                createdAt = 1,
+                updatedAt = 1,
+            ),
+            messages = listOf(
+                message("m-1", 0, "user", "问题"),
+                message("m-2", 1, "assistant", "回答"),
+                message("m-3", 2, "system_notice", "runtime_failed"),
+                message("m-4", 3, "system_notice", "model_retry"),
+                message("m-5", 4, "system_notice", "completed"),
+            ),
+        )
+
+        val newId = EtaConversationAnalysisRepository.import(context, document)
+
+        val restored = EtaDatabase.get(context).conversationDao().messagesForConversation(newId)
+        // 只留信息类通知：完成。
+        assertEquals(listOf("user", "assistant", "system_notice"), restored.map { it.type })
+        assertEquals("completed", restored.last().content)
     }
 
     private suspend fun seedConversation() {
