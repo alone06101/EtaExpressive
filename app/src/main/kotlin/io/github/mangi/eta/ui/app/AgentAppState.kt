@@ -2362,9 +2362,11 @@ internal class AgentAppState(
                 }
             } finally {
                 runtimeRecoveryInProgress.set(false)
+                // 超时那一轮先把 pending 清掉：下面这行重泵因此不会立刻把锁再拿走一轮
+                // （否则用户看到的还是「正在恢复」）。清完之后新到的请求仍会被泵一次。
+                if (timedOut) runtimeRefreshPending.set(false)
                 // 关闸那一刻进来并撞上 CAS 的请求：再泵一次，否则它要等下一次外部触发。
-                // 超时的情况下不再重泵：那会立刻把锁再拿走一轮，用户看到的还是「正在恢复」。
-                if (!timedOut && runtimeRefreshPending.get()) pumpRuntimeRecovery()
+                if (runtimeRefreshPending.get()) pumpRuntimeRecovery()
             }
         }
     }
