@@ -1907,11 +1907,6 @@ fun AgentAppRoot(
                     },
                     onImportModels = agentState::importModels,
                     onImportAnalysis = agentState::importConversationAnalysis,
-                    onApplyImportedBinding = { conversationId, keepOriginal ->
-                        agentState.applyImportedBinding(conversationId, keepOriginal)
-                    },
-                    pendingImportedBindingId = agentState.pendingImportedBindingId,
-                    onDismissImportedBinding = { agentState.dismissImportedBindingDecision() },
                 )
             }
             entry<AppRoute.Memory>(swipeDismiss = navSwipeDismiss) {
@@ -2111,6 +2106,15 @@ fun AgentAppRoot(
     AgentPendingChildStopDialog(agentState.conversationPaneState.selectedConversationId)
 
     // 导出分析 JSON 是纯 IO（含图时几十秒），此前只有按钮防重，没有任何可见反馈。
+    // 导入完成后的绑定选择：两个入口（备份页、空白会话长按）共用同一个全局弹窗。
+    agentState.pendingImportedBindingId?.let { conversationId ->
+        io.github.mangi.eta.ui.components.ImportedBindingDialog(
+            conversationId = conversationId,
+            onDismiss = { agentState.dismissImportedBindingDecision() },
+            onApply = { id, keepOriginal -> agentState.applyImportedBinding(id, keepOriginal) },
+        )
+    }
+
     if (analysisImportIntoBusy) {
         io.github.mangi.eta.ui.components.WorkingDialog(
             title = stringResource(R.string.analysis_importing_title),

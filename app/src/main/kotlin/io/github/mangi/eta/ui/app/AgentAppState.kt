@@ -2701,6 +2701,9 @@ internal class AgentAppState(
             if (!imported) {
                 error(appContext.getString(R.string.analysis_import_into_not_empty))
             }
+            // 与备份页导入保持一致：同样让用户决定沿用导出时的绑定还是用当前的。
+            pendingImportedAnalysis = conversationId to document
+            pendingImportedBindingId = conversationId
             reloadConversationsAfterBackup()
         }
 

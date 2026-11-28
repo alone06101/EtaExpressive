@@ -74,10 +74,7 @@ internal fun DataBackupScreen(
     onImport: suspend (InputStream) -> EtaBackupSummary,
     onImportModels: suspend (InputStream) -> EtaModelBackupSummary,
     onImportAnalysis: suspend (String) -> String,
-    onApplyImportedBinding: suspend (String, Boolean) -> Boolean = { _, _ -> false },
     /** 待用户选择绑定的导入会话 id；由宿主状态提供，避免重整时丢失。 */
-    pendingImportedBindingId: String? = null,
-    onDismissImportedBinding: () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     var exporting by remember { mutableStateOf(false) }
@@ -563,41 +560,7 @@ internal fun DataBackupScreen(
             )
         }
 
-        // 导入完成后让用户选：沿用导出时的模型与助手，还是使用当前的选择。
-        pendingImportedBindingId?.let { conversationId ->
-            AlertDialog(
-                onDismissRequest = onDismissImportedBinding,
-                title = { M3Text(text = stringResource(R.string.import_binding_title)) },
-                text = { M3Text(text = stringResource(R.string.import_binding_message)) },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            scope.launch {
-                                val applied = onApplyImportedBinding(conversationId, true)
-                                if (!applied) {
-                                    Toast.makeText(
-                                        context,
-                                        context.getString(R.string.import_binding_unavailable),
-                                        Toast.LENGTH_LONG,
-                                    ).show()
-                                }
-                            }
-                        },
-                    ) {
-                        M3Text(text = stringResource(R.string.import_binding_keep))
-                    }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = {
-                            scope.launch { onApplyImportedBinding(conversationId, false) }
-                        },
-                    ) {
-                        M3Text(text = stringResource(R.string.import_binding_current))
-                    }
-                },
-            )
-        }
+
     }
 }
 
