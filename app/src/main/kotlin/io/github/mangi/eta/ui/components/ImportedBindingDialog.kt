@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
 internal fun ImportedBindingDialog(
     conversationId: String,
     onDismiss: () -> Unit,
-    onApply: suspend (String, Boolean) ARROW Boolean,
+    onApply: suspend (String, Boolean) -> Boolean,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
