@@ -1,5 +1,6 @@
 package io.github.mangi.eta.data.repository
 
+import io.github.mangi.eta.agent.model.AgentConversationCodec
 import io.github.mangi.eta.agent.model.AgentModelClient
 import io.github.mangi.eta.data.db.ConversationContextCheckpointEntity
 import io.github.mangi.eta.data.db.ConversationEntity
@@ -558,6 +559,86 @@ class EtaConversationAnalysisTest {
         // 只留信息类通知：完成。
         assertEquals(listOf("user", "assistant", "system_notice"), restored.map { it.type })
         assertEquals("completed", restored.last().content)
+    }
+
+    @Test
+    fun importDropsDanglingToolRowsFromTheHistory() = runBlocking {
+        // 现场 HTTP 400：Messages with role 'tool' must be a response to a preceding
+        // message with 'tool_calls'。导出文件里的 history 带着孤立 tool 行时，
+        // 导入后每次发送都会被上游拒绝，界面显示「重连失败」。
+        val toolCalls = "[{\"id\":\"call-1\",\"type\":\"function\"," +
+            "\"function\":{\"name\":\"read_file\",\"arguments\":\"{}\"}}]"
+        val document = EtaConversationAnalysisDocument(
+            exportedAt = 1,
+            conversation = EtaConversationAnalysisConversation(
+                id = "source-conv",
+                title = "带工具调用",
+                createdAt = 1,
+                updatedAt = 1,
+            ),
+            messages = listOf(message("m-1", 0, "user", "问题")),
+            history = listOf(
+                AgentModelClient.ConversationMessage(role = "user", content = "问题"),
+                AgentModelClient.ConversationMessage(
+                    role = "assistant",
+                    content = "",
+                    toolCallsJson = toolCalls,
+                ),
+                AgentModelClient.ConversationMessage(
+                    role = "tool",
+                    content = "正常结果",
+                    toolCallId = "call-1",
+                ),
+                AgentModelClient.ConversationMessage(
+                    role = "tool",
+                    content = "孤立结果",
+                    toolCallId = "call-orphan",
+                ),
+            ),
+        )
+
+        val newId = EtaConversationAnalysisRepository.import(context, document)
+
+        val checkpoint = EtaDatabase.get(context).conversationDao().contextCheckpoint(newId)
+        assertNotNull(checkpoint)
+        val decoded = AgentConversationCodec.decodeTranscript(checkpoint!!.historyJson)
+        assertEquals(listOf("user", "assistant", "tool"), decoded.map { it.role })
+        assertTrue(decoded.none { it.toolCallId == "call-orphan" })
+        assertEquals("正常结果", decoded.last().content)
+    }
+
+    @Test
+    fun importClearsToolCallDeclarationsThatNeverGotAResult() = runBlocking {
+        val toolCalls = "[{\"id\":\"call-9\",\"type\":\"function\"," +
+            "\"function\":{\"name\":\"grep\",\"arguments\":\"{}\"}}]"
+        val document = EtaConversationAnalysisDocument(
+            exportedAt = 1,
+            conversation = EtaConversationAnalysisConversation(
+                id = "source-conv",
+                title = "悬空调用",
+                createdAt = 1,
+                updatedAt = 1,
+            ),
+            messages = listOf(message("m-1", 0, "user", "问题")),
+            history = listOf(
+                AgentModelClient.ConversationMessage(role = "user", content = "问题"),
+                AgentModelClient.ConversationMessage(
+                    role = "assistant",
+                    content = "我查一下",
+                    toolCallsJson = toolCalls,
+                ),
+                AgentModelClient.ConversationMessage(role = "assistant", content = "后续回答"),
+            ),
+        )
+
+        val newId = EtaConversationAnalysisRepository.import(context, document)
+
+        val checkpoint = EtaDatabase.get(context).conversationDao().contextCheckpoint(newId)
+        val decoded = AgentConversationCodec.decodeTranscript(checkpoint!!.historyJson)
+        // 声明被清空，但正文保留：它退化成普通 assistant 行。
+        assertEquals("", decoded[1].toolCallsJson)
+        assertEquals("我查一下", decoded[1].content)
+        assertEquals("后续回答", decoded[2].content)
     }
 
     private suspend fun seedConversation() {

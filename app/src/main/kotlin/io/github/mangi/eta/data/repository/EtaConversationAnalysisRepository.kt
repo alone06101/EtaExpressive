@@ -329,7 +329,7 @@ internal object EtaConversationAnalysisRepository {
             runCatching {
                 ConversationContextCheckpointEntity(
                     conversationId = id,
-                    historyJson = encodeCheckpoint(history),
+                    historyJson = encodeCheckpoint(sanitizeImportedHistory(history)),
                     cloudUsageJson = "",
                 )
             }.onFailure {
@@ -685,6 +685,89 @@ internal object EtaConversationAnalysisRepository {
         JSONArray().also { array -> values.forEach(array::put) }.toString()
 
     /** 检查点有容量上限；放不下时按应用自身的做法去掉回合保护再编一次。 */
+    /**
+     * 让导入的模型历史自洽，否则一发送就被上游拒。
+     *
+     * 现场（HTTP 400）：Messages with role 'tool' must be a response to a preceding
+     * message with 'tool_calls'。导出文件里的 history 是模型侧原文，导入方只按
+     * 消息类型过滤了 messages，history 原样搬进检查点；一旦其中出现孤立 tool 行
+     * （前面没有带 tool_calls 的 assistant），或 assistant 声明了调用却没有对应结果，
+     * 每次请求都会被上游判为参数非法，界面上表现为「重连失败」。
+     *
+     * 规则：
+     * - 孤立 tool（没有匹配的 tool_call_id）→ 丢弃；
+     * - assistant 的 tool_calls 没等到任何结果 → 清空它的 toolCallsJson（保留正文），
+     *   这样它退化成普通 assistant 行，不会留下悬空声明。
+     */
+    private fun sanitizeImportedHistory(
+        history: List<AgentModelClient.ConversationMessage>,
+    ): List<AgentModelClient.ConversationMessage> {
+        if (history.isEmpty()) return history
+        val result = ArrayList<AgentModelClient.ConversationMessage>(history.size)
+        var pendingCallIds = LinkedHashSet<String>()
+        var pendingAssistantIndex = -1
+        var droppedTools = 0
+        var clearedDeclarations = 0
+
+        fun closePendingDeclarations() {
+            if (pendingCallIds.isEmpty()) return
+            val index = pendingAssistantIndex
+            if (index in result.indices) {
+                val message = result[index]
+                if (message.toolCallsJson.isNotBlank()) {
+                    result[index] = message.copy(toolCallsJson = "")
+                    clearedDeclarations++
+                }
+            }
+            pendingCallIds = LinkedHashSet()
+            pendingAssistantIndex = -1
+        }
+
+        for (message in history) {
+            if (message.role == "tool") {
+                val callId = message.toolCallId.trim()
+                if (callId.isNotEmpty() && pendingCallIds.remove(callId)) {
+                    result += message
+                } else {
+                    droppedTools++
+                }
+                continue
+            }
+            closePendingDeclarations()
+            result += message
+            if (message.role == "assistant" && message.toolCallsJson.isNotBlank()) {
+                val ids = toolCallIds(message.toolCallsJson)
+                if (ids.isEmpty()) {
+                    // 声明解析不出 id 就等于没有调用，直接清掉。
+                    result[result.size - 1] = message.copy(toolCallsJson = "")
+                    clearedDeclarations++
+                } else {
+                    pendingCallIds = LinkedHashSet(ids)
+                    pendingAssistantIndex = result.size - 1
+                }
+            }
+        }
+        closePendingDeclarations()
+        if (droppedTools > 0 || clearedDeclarations > 0) {
+            AndroidAgentLogger.warn(
+                "analysis import: history normalized (droppedTools=" + droppedTools +
+                    ", clearedDeclarations=" + clearedDeclarations + ")",
+            )
+        }
+        return result
+    }
+
+    private fun toolCallIds(toolCallsJson: String): List<String> =
+        runCatching {
+            val array = JSONArray(toolCallsJson)
+            buildList {
+                for (index in 0 until array.length()) {
+                    val id = array.optJSONObject(index)?.optString("id").orEmpty().trim()
+                    if (id.isNotEmpty()) add(id)
+                }
+            }
+        }.getOrDefault(emptyList())
+
     private fun encodeCheckpoint(history: List<AgentModelClient.ConversationMessage>): String =
         try {
             AgentConversationCodec.encodeConversationCheckpoint(history)
@@ -741,7 +824,7 @@ internal object EtaConversationAnalysisRepository {
             runCatching {
                 ConversationContextCheckpointEntity(
                     conversationId = conversationId,
-                    historyJson = encodeCheckpoint(history),
+                    historyJson = encodeCheckpoint(sanitizeImportedHistory(history)),
                     cloudUsageJson = "",
                 )
             }.onFailure {

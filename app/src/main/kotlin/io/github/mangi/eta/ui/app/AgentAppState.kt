@@ -370,6 +370,9 @@ internal class AgentAppState(
     private var bindingRefreshAfterArchive = false
     private val deferredArchiveSaves = mutableListOf<Pair<kotlinx.coroutines.CompletableDeferred<Boolean>, (() -> Unit)?>>()
     private val runtimeRecoveryInProgress = AtomicBoolean(false)
+
+    /** 启动期运行恢复的兜底超时：卡住时释放归档锁，不让导入/导出被永久拒绝。 */
+    private val STARTUP_RECOVERY_TIMEOUT_MS = 30_000L
     /** 恢复进行中又来了新请求：不丢弃、合并成「跑完再来一遍」。 */
     private val runtimeRefreshPending = AtomicBoolean(false)
     // Main-thread cursor: bounded recovery passes rotate rather than dropping older owners.
@@ -1874,8 +1877,21 @@ internal class AgentAppState(
                 }
                 // 与 [refreshRuntimeResults] 同一口径：归档（完整事件流）先于 outbox（只有
                 // 最终 result）导入，否则语音浮窗等外部入口的思考 / 工具卡会被折叠结果顶掉。
-                importArchivedExternalRuns()
-                recoverRuntimeRuns()
+                // 启动恢复必须自己兜底：它持有 runtimeRecoveryInProgress，一旦内部
+                // 卡住（等待运行服务、读归档事件等），这个标志会永久为 true，
+                // 之后所有归档类操作（导入分析文件、导出、恢复备份）都被拒绝，
+                // 用户看到的是一句「正在恢复上次运行」循环出现，且永远等不到。
+                val finished = withTimeoutOrNull(STARTUP_RECOVERY_TIMEOUT_MS) {
+                    importArchivedExternalRuns()
+                    recoverRuntimeRuns()
+                    true
+                }
+                if (finished == null) {
+                    AndroidAgentLogger.warn(
+                        "startup runtime recovery timed out after " +
+                            STARTUP_RECOVERY_TIMEOUT_MS + "ms; releasing the archive lock",
+                    )
+                }
             } finally {
                 runtimeRecoveryInProgress.set(false)
                 // 构造期恢复进行中落库的终态：同 [pumpRuntimeRecovery] 的关闸补泵口径。
