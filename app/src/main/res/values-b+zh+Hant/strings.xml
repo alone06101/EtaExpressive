@@ -2307,6 +2307,11 @@
   <string name="capability_assist_move_down">下移</string>
   <string name="conversation_analysis_file_too_large">分析檔案過大，已取消匯入</string>
   <string name="conversation_import_suffix">（匯入）</string>
+  <string name="import_binding_title">匯入完成</string>
+  <string name="import_binding_message">這個會話要使用哪套模型與助手？</string>
+  <string name="import_binding_keep">沿用匯出時的</string>
+  <string name="import_binding_current">使用目前的</string>
+  <string name="import_binding_unavailable">匯出時的模型或助手在本機不存在，已使用目前選擇</string>
   <string name="provider_system_prompt_title">系統提示詞</string>
   <string name="provider_system_prompt_label">系統提示詞</string>
   <string name="provider_system_prompt_summary">留空則不注入。助手的「跟隨服務商」開啟且此處有內容時，執行時優先使用它，助手人格與能力塊追加在其後。</string>

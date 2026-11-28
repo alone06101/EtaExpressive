@@ -315,6 +315,66 @@ internal object EtaConversationAnalysisRepository {
     }
 
     /**
+     * 让用户决定导入会话用哪套绑定。
+     *
+     * 导入时默认不绑定（provider/model/assistant 留空，运行时回落到当前选择），
+     * 这里在导入后按用户选择改写：
+     * - keepOriginal = true：尽量沿用导出时的模型与助手，但每一项都要在本机存在，
+     *   缺失的那部分留空（不留一个指向不存在对象的 id）。
+     * - keepOriginal = false：清空绑定，等同「使用当前的」。
+     *
+     * @return 是否至少沿用了一项；全都没法沿用（或选择清空）时返回 false
+     */
+    suspend fun applyImportedBinding(
+        context: Context,
+        conversationId: String,
+        document: EtaConversationAnalysisDocument,
+        keepOriginal: Boolean,
+    ): Boolean = withContext(Dispatchers.IO) {
+        val appContext = context.applicationContext
+        val dao = EtaDatabase.get(appContext).conversationDao()
+        dao.conversationEntity(conversationId) ?: return@withContext false
+
+        val providerId = if (keepOriginal) {
+            document.conversation.providerId.takeIf { id ->
+                id.isNotBlank() && runCatching {
+                    ProviderRepository.providerById(id)?.takeIf { provider ->
+                        provider.isEnabled && provider.models.any {
+                            it.id == document.conversation.modelId && it.isEnabled
+                        }
+                    }
+                }.getOrNull() != null
+            }
+        } else {
+            null
+        }
+        val assistantId = if (keepOriginal) {
+            document.conversation.assistantId.takeIf { id ->
+                id.isNotBlank() && runCatching { AssistantRepository.profile(id) != null }.getOrDefault(false)
+            }
+        } else {
+            null
+        }
+        val folderId = if (keepOriginal) {
+            document.conversation.folderId.takeIf { id ->
+                id.isNotBlank() && runCatching { dao.folders().any { it.id == id } }.getOrDefault(false)
+            }
+        } else {
+            null
+        }
+
+        dao.updateImportedBinding(
+            id = conversationId,
+            providerId = providerId.orEmpty(),
+            modelId = if (providerId != null) document.conversation.modelId else "",
+            assistantId = assistantId.orEmpty(),
+            folderId = folderId.orEmpty(),
+            updatedAt = System.currentTimeMillis(),
+        )
+        keepOriginal && (providerId != null || assistantId != null || folderId != null)
+    }
+
+    /**
      * 模型历史优先读文件，其次读检查点——与应用自己的加载顺序一致。
      *
      * 少了这一步，导入方拿不到工具角色的历史，新会话只能靠消息行反推，工具上下文会丢。

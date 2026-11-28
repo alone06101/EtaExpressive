@@ -1846,6 +1846,9 @@ fun AgentAppRoot(
                     },
                     onImportModels = agentState::importModels,
                     onImportAnalysis = agentState::importConversationAnalysis,
+                    onApplyImportedBinding = { conversationId, keepOriginal ->
+                        agentState.applyImportedBinding(conversationId, keepOriginal)
+                    },
                 )
             }
             entry<AppRoute.Memory>(swipeDismiss = navSwipeDismiss) {

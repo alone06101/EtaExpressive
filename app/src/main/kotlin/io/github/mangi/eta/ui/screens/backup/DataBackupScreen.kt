@@ -53,8 +53,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text as M3Text
 
 /**
@@ -71,12 +73,14 @@ internal fun DataBackupScreen(
     onImport: suspend (InputStream) -> EtaBackupSummary,
     onImportModels: suspend (InputStream) -> EtaModelBackupSummary,
     onImportAnalysis: suspend (String) -> String,
+    onApplyImportedBinding: suspend (String, Boolean) -> Boolean = { _, _ -> false },
 ) {
     val scope = rememberCoroutineScope()
     var exporting by remember { mutableStateOf(false) }
     var importing by remember { mutableStateOf(false) }
     var detecting by remember { mutableStateOf(false) }
     var importingAnalysis by remember { mutableStateOf(false) }
+    var pendingBindingDecision by remember { mutableStateOf<String?>(null) }
     val busy = exporting || importing || detecting || importingAnalysis
     // 类别勾选：应用数据默认带上，Linux 环境 / 模型这类大件默认不带。
     var includeAppData by remember { mutableStateOf(true) }
@@ -244,12 +248,14 @@ internal fun DataBackupScreen(
                         buffer.toString(Charsets.UTF_8.name())
                     }
                 }
-                onImportAnalysis(raw)
+                val importedId = onImportAnalysis(raw)
                 Toast.makeText(
                     context,
                     context.getString(R.string.conversation_analysis_imported),
                     Toast.LENGTH_SHORT,
                 ).show()
+                // 导入后让用户决定：沿用导出时的模型与助手，还是使用当前的选择。
+                pendingBindingDecision = importedId
             } catch (throwable: Throwable) {
                 showFailure(throwable)
             } finally {
@@ -543,6 +549,44 @@ internal fun DataBackupScreen(
                 )
             },
         ) {
+        }
+
+        // 导入完成后让用户选：沿用导出时的模型与助手，还是使用当前的选择。
+        pendingBindingDecision?.let { conversationId ->
+            AlertDialog(
+                onDismissRequest = { pendingBindingDecision = null },
+                title = { M3Text(text = stringResource(R.string.import_binding_title)) },
+                text = { M3Text(text = stringResource(R.string.import_binding_message)) },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            pendingBindingDecision = null
+                            scope.launch {
+                                val applied = onApplyImportedBinding(conversationId, true)
+                                if (!applied) {
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(R.string.import_binding_unavailable),
+                                        Toast.LENGTH_LONG,
+                                    ).show()
+                                }
+                            }
+                        },
+                    ) {
+                        M3Text(text = stringResource(R.string.import_binding_keep))
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            pendingBindingDecision = null
+                            scope.launch { onApplyImportedBinding(conversationId, false) }
+                        },
+                    ) {
+                        M3Text(text = stringResource(R.string.import_binding_current))
+                    }
+                },
+            )
         }
     }
 }

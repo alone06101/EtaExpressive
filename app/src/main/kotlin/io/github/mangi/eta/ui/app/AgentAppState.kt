@@ -2624,8 +2624,34 @@ internal class AgentAppState(
             document,
             titleSuffix = appContext.getString(R.string.conversation_import_suffix),
         )
+        // 记下这次导入的来源，供界面弹窗让用户选择「沿用导出时的绑定」还是「使用当前的」。
+        pendingImportedAnalysis = id to document
         reloadConversationsAfterBackup()
         id
+    }
+
+    /** 最近一次导入的会话与其来源文档；界面在选择绑定后调用 [applyImportedBinding]。 */
+    private var pendingImportedAnalysis: Pair<String, EtaConversationAnalysisDocument>? = null
+
+    /**
+     * 应用用户在导入后做出的绑定选择。
+     *
+     * keepOriginal=true 时尽量沿用导出时的模型、助手与分类（逐项做存在性校验）；
+     * false 时清空绑定，等同「使用当前的」。
+     *
+     * @return 是否至少沿用了一项；选择「使用当前的」或原绑定都不可用时返回 false
+     */
+    suspend fun applyImportedBinding(conversationId: String, keepOriginal: Boolean): Boolean {
+        val (id, document) = pendingImportedAnalysis
+            ?.takeIf { it.first == conversationId } ?: return false
+        val applied = EtaConversationAnalysisRepository.applyImportedBinding(
+            appContext,
+            id,
+            document,
+            keepOriginal,
+        )
+        if (keepOriginal) reloadConversationsAfterBackup()
+        return applied
     }
 
     /** 只恢复模型文件，不改动对话、设置与附件。 */

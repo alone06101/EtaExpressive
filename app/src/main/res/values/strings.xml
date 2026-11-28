@@ -2329,6 +2329,11 @@
   <string name="capability_assist_move_down">Move down</string>
   <string name="conversation_analysis_file_too_large">The analysis file is too large; import cancelled</string>
   <string name="conversation_import_suffix"> (imported)</string>
+  <string name="import_binding_title">Import finished</string>
+  <string name="import_binding_message">Which model and assistant should this conversation use?</string>
+  <string name="import_binding_keep">Keep the exported ones</string>
+  <string name="import_binding_current">Use the current ones</string>
+  <string name="import_binding_unavailable">The exported model or assistant is not available on this device; the current selection is used</string>
   <string name="provider_system_prompt_title">System prompt</string>
   <string name="provider_system_prompt_label">System prompt</string>
   <string name="provider_system_prompt_summary">Leave blank to skip. When the assistant follows the provider and this is filled, the runtime uses it as the base prompt and appends the personality and capability blocks after it.</string>

@@ -74,6 +74,25 @@ internal interface ConversationDao {
         "model_id = :modelId, assistant_id = :assistantId, folder_id = :folderId, " +
         "updated_at = :updatedAt WHERE id = :id"
     )
+    /**
+     * 写入导入会话的绑定选择。
+     *
+     * 导入时默认不绑定任何模型/助手（回落到当前选择），用户在导入后可以改成
+     * 「沿用导出时的」。调用方负责先做存在性校验，这里只负责落库。
+     */
+    @Query(
+        "UPDATE conversations SET provider_id = :providerId, model_id = :modelId, " +
+        "assistant_id = :assistantId, folder_id = :folderId, updated_at = :updatedAt WHERE id = :id"
+    )
+    suspend fun updateImportedBinding(
+        id: String,
+        providerId: String,
+        modelId: String,
+        assistantId: String,
+        folderId: String,
+        updatedAt: Long,
+    )
+
     suspend fun updateCloneMetadata(
         id: String,
         title: String,
