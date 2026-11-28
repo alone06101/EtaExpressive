@@ -18,7 +18,7 @@ import org.junit.runners.model.Statement
  * 重试前留一点退避时间，让上一条连接的 checkpoint 有机会落盘；
  * 用例自身在开头都会重建种子库，因此重跑是幂等的。
  */
-internal class DatabaseTestRetryRule(private val attempts: Int = 3) : TestRule {
+internal class DatabaseTestRetryRule(private val attempts: Int = 2) : TestRule {
     override fun apply(base: Statement, description: Description): Statement = object : Statement() {
         override fun evaluate() {
             var last: Throwable? = null
