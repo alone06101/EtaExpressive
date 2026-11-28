@@ -10,9 +10,11 @@ import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -41,6 +43,31 @@ class DispatchSchemaDriftMigrationTest {
      */
     @get:Rule
     private val databaseRetry = DatabaseTestRetryRule()
+
+    /**
+     * 本类每个用例使用独立库名。
+     *
+     * 以前它固定打开 eta.db，而同一 Robolectric worker 里其它测试类也会打开它：跨类
+     * 残留的 SQLite 连接不归单例管，清库后仍可能把旧版本写回，随机读到不属于自己的库。
+     * 用独立库名从根上避开，而不是靠重试去碰运气。
+     */
+    private lateinit var dbName: String
+
+    @Before
+    fun useIsolatedDatabase() {
+        dbName = "eta-migration-" + UUID.randomUUID() + ".db"
+        EtaDatabase.databaseNameForTests(dbName)
+        EtaDatabase.closeForTests()
+        purgeProductionDatabase(RuntimeEnvironment.getApplication() as Context)
+    }
+
+    @After
+    fun restoreDatabaseName() {
+        val context = RuntimeEnvironment.getApplication() as Context
+        EtaDatabase.closeForTests()
+        purgeProductionDatabase(context)
+        EtaDatabase.databaseNameForTests(null)
+    }
 
     @Test
     fun staleVersion39FromDeviceUpgradesTo40AndKeepsData() {
@@ -202,9 +229,9 @@ class DispatchSchemaDriftMigrationTest {
         // 于是同名新库里塞多少数据它都看不见。本仓库其余测试也在 @Before 里先关单例。
         EtaDatabase.closeForTests()
         purgeProductionDatabase(context)
-        seed(context, PRODUCTION_DB_NAME, version = 38, stripDispatchParentColumn = true)
+        seed(context, dbName, version = 38, stripDispatchParentColumn = true)
         // 先自证种子状态：若这里就不是 38 + 1 行，那「数据没了」与 Room 无关。
-        val seeded = readSeededState(context, PRODUCTION_DB_NAME, version = 38)
+        val seeded = readSeededState(context, dbName, version = 38)
         assertEquals("种子库 user_version", 38, seeded.first)
         assertEquals("种子库 conversations 行数", 1L, seeded.second)
 
@@ -238,7 +265,7 @@ class DispatchSchemaDriftMigrationTest {
         EtaDatabase.closeForTests()
         purgeProductionDatabase(context)
         val configuration = SupportSQLiteOpenHelper.Configuration.builder(context)
-            .name(PRODUCTION_DB_NAME)
+            .name(dbName)
             .callback(
                 object : SupportSQLiteOpenHelper.Callback(5) {
                     override fun onCreate(db: SupportSQLiteDatabase) {
@@ -293,10 +320,10 @@ class DispatchSchemaDriftMigrationTest {
      * 不清干净的话，上一个用例留在 40 的库会被这次当成「降级到 38」直接拒掉。
      */
     private fun purgeProductionDatabase(context: Context) {
-        val db = context.getDatabasePath(PRODUCTION_DB_NAME)
+        val db = context.getDatabasePath(dbName)
         // 先走 Context.deleteDatabase 断开同名连接再清文件：只 unlink 主文件时，别的测试类
         // 留下的 SQLite 连接仍持有 fd，WAL checkpoint 会把旧版本写回同一个路径。
-        context.deleteDatabase(PRODUCTION_DB_NAME)
+        context.deleteDatabase(dbName)
         listOf(db, File("${'$'}{db.path}-wal"), File("${'$'}{db.path}-shm"), File("${'$'}{db.path}-journal"))
             .forEach { it.delete() }
     }
@@ -456,6 +483,7 @@ class DispatchSchemaDriftMigrationTest {
         const val STALE_IDENTITY_HASH = "9a4c19ff55cb624e0c9a5bf7c5250992"
 
         /** [EtaDatabase.get] 里硬编码的文件名；改它等于改生产代码，这里跟着一起改。 */
+        /** 默认生产库名；测试里会通过 [EtaDatabase.databaseNameForTests] 换成独立库名。 */
         const val PRODUCTION_DB_NAME = "eta.db"
 
         val DEVICE_V39_SCHEMA: List<String> = loadResource("/migration/device-v39-schema.sql")

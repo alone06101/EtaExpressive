@@ -7,11 +7,13 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.core.app.ApplicationProvider
+import java.util.UUID
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -30,6 +32,22 @@ class EtaDatabaseIdentityRecoveryTest {
     @get:Rule
     private val databaseRetry = DatabaseTestRetryRule()
 
+    /** 与迁移测试同理：用独立库名，避开跨类 eta.db 竞争。 */
+    private lateinit var dbName: String
+
+    @Before
+    fun useIsolatedDatabase() {
+        dbName = "eta-identity-" + UUID.randomUUID() + ".db"
+        EtaDatabase.databaseNameForTests(dbName)
+        EtaDatabase.closeForTests()
+    }
+
+    @After
+    fun restoreDatabaseName() {
+        EtaDatabase.closeForTests()
+        EtaDatabase.databaseNameForTests(null)
+    }
+
     @After
     fun tearDown() {
         EtaDatabase.closeForTests()
@@ -41,7 +59,7 @@ class EtaDatabaseIdentityRecoveryTest {
         // 先正常建一次库写入正确 hash，再直改 master table 模拟「eta.db 被异版本构建整文件替换」。
         EtaDatabase.get(context)
         EtaDatabase.closeForTests()
-        val file = context.getDatabasePath("eta.db")
+        val file = context.getDatabasePath(dbName)
         assertTrue("正常建库后 eta.db 文件应存在", file.isFile)
         corruptIdentityHash(file.path, "deadbeefdeadbeefdeadbeefdeadbeefdead")
 
@@ -61,7 +79,7 @@ class EtaDatabaseIdentityRecoveryTest {
         // Room 全量校验发现表全缺，必须抛明确错误而不是静默改库或静默放行。
         val helper = FrameworkSQLiteOpenHelperFactory().create(
             SupportSQLiteOpenHelper.Configuration.builder(context)
-                .name("eta.db")
+                .name(dbName)
                 .callback(object : SupportSQLiteOpenHelper.Callback(ETA_SCHEMA_VERSION) {
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         db.execSQL("CREATE TABLE room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT NOT NULL)")
@@ -83,7 +101,7 @@ class EtaDatabaseIdentityRecoveryTest {
         }
         // 校验失败后 master table 不得被重新写回（不能装作恢复成功）。
         val masterTableCount = queryScalarLong(
-            context.getDatabasePath("eta.db").path,
+            context.getDatabasePath(dbName).path,
             "SELECT COUNT(*) FROM sqlite_master WHERE name = 'room_master_table'",
         )
         assertEquals(0L, masterTableCount)

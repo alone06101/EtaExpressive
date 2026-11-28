@@ -48,6 +48,30 @@ internal abstract class EtaDatabase : RoomDatabase() {
         @Volatile
         private var instance: EtaDatabase? = null
 
+        /**
+         * 测试期库名覆盖。
+         *
+         * 迁移类与分析导入类测试要验证「生产入口打开库」的行为，而 Robolectric 让同一
+         * JVM 内所有测试类共享应用私有目录：它们都去动同一个 eta.db 时，别的测试类留下
+         * 的 SQLite 连接会把旧版本写回，表现为随机的断言失败（每次失败的用例还不一样）。
+         *
+         * 给这些测试一个各自的库名，就从根上避开了这类竞争；生产路径永远走
+         * [DEFAULT_DATABASE_NAME]。
+         */
+        @Volatile
+        private var testDatabaseName: String? = null
+
+        /** 测试用：切换库名并关掉现有实例；传 null 恢复默认。 */
+        internal fun databaseNameForTests(name: String?) {
+            if (testDatabaseName == name) return
+            testDatabaseName = name
+            closeForTests()
+        }
+
+        private fun databaseName(): String = testDatabaseName ?: DEFAULT_DATABASE_NAME
+
+        private const val DEFAULT_DATABASE_NAME = "eta.db"
+
         fun get(context: Context): EtaDatabase =
             instance ?: synchronized(this) {
                 instance ?: build(context.applicationContext).also { instance = it }
@@ -73,7 +97,7 @@ internal abstract class EtaDatabase : RoomDatabase() {
                 Room.databaseBuilder(
                     context,
                     EtaDatabase::class.java,
-                    "eta.db",
+                    databaseName(),
                 )
                     .addMigrations(*ALL_MIGRATIONS)
                     // 不再无条件清库。原先的 fallbackToDestructiveMigration 会对**任何**缺失的迁移
@@ -106,7 +130,7 @@ internal abstract class EtaDatabase : RoomDatabase() {
 
         /** Room 实例必须先关闭（避免 WAL 竞态），再对库文件直删 master table。 */
         private fun dropMasterIdentity(context: Context) {
-            val file = context.getDatabasePath("eta.db")
+            val file = context.getDatabasePath(databaseName())
             if (!file.isFile) return
             android.database.sqlite.SQLiteDatabase.openDatabase(
                 file.path,

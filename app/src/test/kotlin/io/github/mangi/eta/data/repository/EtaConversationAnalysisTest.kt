@@ -10,6 +10,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.Rule
@@ -32,21 +33,32 @@ class EtaConversationAnalysisTest {
 
     private val context = RuntimeEnvironment.getApplication()
 
+    /** 独立库名：避开跨测试类共享 eta.db 造成的偶发读到脏库。 */
+    private var dbName: String = "eta-analysis.db"
+
     @Before
     fun setUp() {
+        dbName = "eta-analysis-" + java.util.UUID.randomUUID() + ".db"
+        EtaDatabase.databaseNameForTests(dbName)
         EtaDatabase.closeForTests()
         // 同一 Robolectric worker 里别的测试类的连接不归单例管，可能仍持有 eta.db：
         // 单次 deleteDatabase 有时删不掉，残留库会让 seed 写到旧数据上，
         // 最后在「run id 被重映射」那条断言处以误导的方式失败。这里重试并给出明确诊断。
         var attempt = 0
-        while (attempt < 10 && context.getDatabasePath("eta.db").exists()) {
-            context.deleteDatabase("eta.db")
+        while (attempt < 10 && context.getDatabasePath(dbName).exists()) {
+            context.deleteDatabase(dbName)
             attempt++
-            if (context.getDatabasePath("eta.db").exists()) Thread.sleep(20L)
+            if (context.getDatabasePath(dbName).exists()) Thread.sleep(20L)
         }
-        check(!context.getDatabasePath("eta.db").exists()) {
-            "eta.db 未能清除（尝试 $attempt 次）：仍有其它测试类的连接持有它"
+        check(!context.getDatabasePath(dbName).exists()) {
+            "独立测试库未能清除（尝试 $attempt 次）"
         }
+    }
+
+    @After
+    fun restoreDatabaseName() {
+        EtaDatabase.closeForTests()
+        EtaDatabase.databaseNameForTests(null)
     }
 
     private fun message(
