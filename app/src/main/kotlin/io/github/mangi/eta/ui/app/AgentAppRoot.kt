@@ -1849,6 +1849,8 @@ fun AgentAppRoot(
                     onApplyImportedBinding = { conversationId, keepOriginal ->
                         agentState.applyImportedBinding(conversationId, keepOriginal)
                     },
+                    pendingImportedBindingId = agentState.pendingImportedBindingId,
+                    onDismissImportedBinding = { agentState.dismissImportedBindingDecision() },
                 )
             }
             entry<AppRoute.Memory>(swipeDismiss = navSwipeDismiss) {

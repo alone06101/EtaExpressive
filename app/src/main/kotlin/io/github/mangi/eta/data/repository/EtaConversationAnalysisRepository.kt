@@ -47,12 +47,18 @@ internal object EtaConversationAnalysisRepository {
     /** 只用于凭据脱敏与截断判断，不参与写库。 */
     private val traceFormatter = AgentTraceFormatter()
 
-    /** 应用认识的会话消息类型；其余类型在导入时直接丢弃。 */
+    /**
+     * 应用认识的会话消息类型；其余类型在导入时直接丢弃。
+     *
+     * 刻意不含 error_reconnect：它记录的是「当时那一次运行失败/被重连」，
+     * 属于运行状态而不是会话内容。canContinueDisconnectedRun 只看最后一条消息，
+     * 一旦把它带进新会话，导入后一打开就处于「可继续断连运行」的状态，
+     * 用户看到的是一直提示重连失败。
+     */
     private val IMPORTABLE_MESSAGE_TYPES = setOf(
         "user",
         "assistant",
         "system_notice",
-        "error_reconnect",
         "thinking",
         "tool",
         "tool_summary",

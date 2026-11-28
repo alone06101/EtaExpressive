@@ -74,13 +74,15 @@ internal fun DataBackupScreen(
     onImportModels: suspend (InputStream) -> EtaModelBackupSummary,
     onImportAnalysis: suspend (String) -> String,
     onApplyImportedBinding: suspend (String, Boolean) -> Boolean = { _, _ -> false },
+    /** 待用户选择绑定的导入会话 id；由宿主状态提供，避免重整时丢失。 */
+    pendingImportedBindingId: String? = null,
+    onDismissImportedBinding: () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     var exporting by remember { mutableStateOf(false) }
     var importing by remember { mutableStateOf(false) }
     var detecting by remember { mutableStateOf(false) }
     var importingAnalysis by remember { mutableStateOf(false) }
-    var pendingBindingDecision by remember { mutableStateOf<String?>(null) }
     val busy = exporting || importing || detecting || importingAnalysis
     // 类别勾选：应用数据默认带上，Linux 环境 / 模型这类大件默认不带。
     var includeAppData by remember { mutableStateOf(true) }
@@ -254,8 +256,9 @@ internal fun DataBackupScreen(
                     context.getString(R.string.conversation_analysis_imported),
                     Toast.LENGTH_SHORT,
                 ).show()
-                // 导入后让用户决定：沿用导出时的模型与助手，还是使用当前的选择。
-                pendingBindingDecision = importedId
+                // 待决状态由 AgentAppState 发布（pendingImportedBindingId），
+                // 这里只负责触发导入；弹窗在页面底部按宿主状态渲染。
+                importedId
             } catch (throwable: Throwable) {
                 showFailure(throwable)
             } finally {
@@ -552,15 +555,14 @@ internal fun DataBackupScreen(
         }
 
         // 导入完成后让用户选：沿用导出时的模型与助手，还是使用当前的选择。
-        pendingBindingDecision?.let { conversationId ->
+        pendingImportedBindingId?.let { conversationId ->
             AlertDialog(
-                onDismissRequest = { pendingBindingDecision = null },
+                onDismissRequest = onDismissImportedBinding,
                 title = { M3Text(text = stringResource(R.string.import_binding_title)) },
                 text = { M3Text(text = stringResource(R.string.import_binding_message)) },
                 confirmButton = {
                     TextButton(
                         onClick = {
-                            pendingBindingDecision = null
                             scope.launch {
                                 val applied = onApplyImportedBinding(conversationId, true)
                                 if (!applied) {
@@ -579,7 +581,6 @@ internal fun DataBackupScreen(
                 dismissButton = {
                     TextButton(
                         onClick = {
-                            pendingBindingDecision = null
                             scope.launch { onApplyImportedBinding(conversationId, false) }
                         },
                     ) {

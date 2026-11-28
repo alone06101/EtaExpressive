@@ -2626,13 +2626,19 @@ internal class AgentAppState(
             titleSuffix = appContext.getString(R.string.conversation_import_suffix),
         )
         // 记下这次导入的来源，供界面弹窗让用户选择「沿用导出时的绑定」还是「使用当前的」。
+        // 同一份 id 还发布成可观察状态：界面可能因为列表重载而重建，remember 里的临时状态会丢。
         pendingImportedAnalysis = id to document
+        pendingImportedBindingId = id
         reloadConversationsAfterBackup()
         id
     }
 
     /** 最近一次导入的会话与其来源文档；界面在选择绑定后调用 [applyImportedBinding]。 */
     private var pendingImportedAnalysis: Pair<String, EtaConversationAnalysisDocument>? = null
+
+    /** 等待用户选择绑定的导入会话 id；非空时界面显示二选一弹窗。 */
+    var pendingImportedBindingId by androidx.compose.runtime.mutableStateOf<String?>(null)
+        private set
 
     /**
      * 应用用户在导入后做出的绑定选择。
@@ -2642,15 +2648,24 @@ internal class AgentAppState(
      *
      * @return 是否至少沿用了一项；选择「使用当前的」或原绑定都不可用时返回 false
      */
+    /** 用户关掉了绑定选择弹窗：保持导入时的默认（不绑定，回落到当前选择）。 */
+    fun dismissImportedBindingDecision() {
+        pendingImportedBindingId = null
+    }
+
     suspend fun applyImportedBinding(conversationId: String, keepOriginal: Boolean): Boolean {
         val (id, document) = pendingImportedAnalysis
-            ?.takeIf { it.first == conversationId } ?: return false
+            ?.takeIf { it.first == conversationId } ?: run {
+            pendingImportedBindingId = null
+            return false
+        }
         val applied = EtaConversationAnalysisRepository.applyImportedBinding(
             appContext,
             id,
             document,
             keepOriginal,
         )
+        pendingImportedBindingId = null
         if (keepOriginal) reloadConversationsAfterBackup()
         return applied
     }
