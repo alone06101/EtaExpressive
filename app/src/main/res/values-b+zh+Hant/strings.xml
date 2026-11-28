@@ -2305,6 +2305,8 @@
   <string name="capability_assist_empty">還沒有啟用的提供商</string>
   <string name="capability_assist_move_up">上移</string>
   <string name="capability_assist_move_down">下移</string>
+  <string name="conversation_analysis_file_too_large">分析檔案過大，已取消匯入</string>
+  <string name="conversation_import_suffix">（匯入）</string>
   <string name="provider_system_prompt_title">系統提示詞</string>
   <string name="provider_system_prompt_label">系統提示詞</string>
   <string name="provider_system_prompt_summary">留空則不注入。助手的「跟隨服務商」開啟且此處有內容時，執行時優先使用它，助手人格與能力塊追加在其後。</string>

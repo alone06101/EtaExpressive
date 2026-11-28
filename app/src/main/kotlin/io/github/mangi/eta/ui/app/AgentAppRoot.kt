@@ -523,7 +523,11 @@ fun AgentAppRoot(
                 touchedDestination = true
                 val output = context.contentResolver.openOutputStream(uri, "wt")
                     ?: error(context.getString(R.string.data_backup_file_open_failed))
-                output.use { sink -> sink.write(payload.toByteArray(Charsets.UTF_8)) }
+                // 流式写入：payload 已经是完整字符串，再 toByteArray() 会在峰值上多一份拷贝，
+                // 含图导出时这正好是压垮内存的那一份。
+                output.use { sink ->
+                    java.io.OutputStreamWriter(sink, Charsets.UTF_8).use { writer -> writer.write(payload) }
+                }
                 Toast.makeText(
                     context,
                     context.getString(R.string.conversation_analysis_exported, title),

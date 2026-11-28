@@ -346,10 +346,21 @@ internal object EtaConversationAnalysisCodec {
         return document
     }
 
-    /** 只看开头就能判断是不是分析文件，用来在导入入口分流。 */
+    /**
+     * 只看开头就能判断是不是分析文件，用来在导入入口分流。
+     *
+     * 必须匹配 JSON 字段形态而不只是裸串：任何正文里提到 eta-conversation-analysis
+     * 的文本（例如一段解释这个格式的说明）都会被当成分析文件，最后报「格式无效」
+     * 而不是「这不是分析文件」。
+     */
     fun looksLikeAnalysis(raw: String): Boolean =
-        raw.contains(EtaConversationAnalysisDocument.FORMAT)
+        FORMAT_SIGNATURE.containsMatchIn(raw.take(LOOKS_LIKE_PREFIX_CHARS))
 
     /** 超过约 8 百万字符时提示体积；阈值按真实序列化结果判断，不按消息条数猜。 */
     private const val SIZE_WARNING_CHARS = 8_000_000
+
+    /** 分流只看开头这么多字符，避免对超大文件做整串正则扫描。 */
+    private const val LOOKS_LIKE_PREFIX_CHARS = 4096
+
+    private val FORMAT_SIGNATURE = Regex("\"format\"\\s*:\\s*\"${EtaConversationAnalysisDocument.FORMAT}\"")
 }

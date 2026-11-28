@@ -2327,6 +2327,8 @@
   <string name="capability_assist_empty">No enabled providers yet</string>
   <string name="capability_assist_move_up">Move up</string>
   <string name="capability_assist_move_down">Move down</string>
+  <string name="conversation_analysis_file_too_large">The analysis file is too large; import cancelled</string>
+  <string name="conversation_import_suffix"> (imported)</string>
   <string name="provider_system_prompt_title">System prompt</string>
   <string name="provider_system_prompt_label">System prompt</string>
   <string name="provider_system_prompt_summary">Leave blank to skip. When the assistant follows the provider and this is filled, the runtime uses it as the base prompt and appends the personality and capability blocks after it.</string>

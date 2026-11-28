@@ -2582,6 +2582,9 @@ internal class AgentAppState(
      * 走与「导入会话分析」同一条链路（导出 → 导入为新会话），再回写同机副本应有的
      * provider/model/assistant/folder 与标题后缀；完成后重载会话列表，副本立刻可见。
      */
+    /** 单次分析导入允许的最大字符数（约 24M 字符 ≈ 48MB UTF-16 常驻）。 */
+    private val MAX_ANALYSIS_IMPORT_CHARS = 24_000_000
+
     suspend fun duplicateConversation(conversationId: String, titleSuffix: String): String =
         withConversationArchive(requireIdleRuns = false) {
             val id = ConversationDuplicateRepository.duplicate(appContext, conversationId, titleSuffix)
@@ -2610,8 +2613,17 @@ internal class AgentAppState(
 
     /** 导入会话分析 JSON，还原成一条普通新会话，返回新会话 id。 */
     suspend fun importConversationAnalysis(raw: String): String = withConversationArchive {
+        // 兜底闸：调用方可能已经查过文件大小，但这条路径也要能自己挡住超大内容，
+        // 否则解析阶段就会把内存撑爆（分析 JSON 含图时体积可以很大）。
+        require(raw.length <= MAX_ANALYSIS_IMPORT_CHARS) {
+            "分析文件过大（${raw.length} 字符，上限 $MAX_ANALYSIS_IMPORT_CHARS）"
+        }
         val document = EtaConversationAnalysisCodec.decode(raw)
-        val id = EtaConversationAnalysisRepository.import(appContext, document)
+        val id = EtaConversationAnalysisRepository.import(
+            appContext,
+            document,
+            titleSuffix = appContext.getString(R.string.conversation_import_suffix),
+        )
         reloadConversationsAfterBackup()
         id
     }

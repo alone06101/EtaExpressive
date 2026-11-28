@@ -218,9 +218,28 @@ internal fun DataBackupScreen(
             importingAnalysis = true
             try {
                 val raw = withContext(Dispatchers.IO) {
+                    // 先看大小再读：readBytes() 之后才知道体积的话，内存已经爆了。
+                    val declared = context.contentResolver
+                        .query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)
+                        ?.use { cursor -> if (cursor.moveToFirst()) cursor.getLong(0) else null }
+                    require(declared == null || declared <= MAX_ANALYSIS_FILE_BYTES) {
+                        context.getString(R.string.conversation_analysis_file_too_large)
+                    }
                     val input = context.contentResolver.openInputStream(uri)
                         ?: error(context.getString(R.string.data_backup_file_open_failed))
-                    input.use { it.readBytes().toString(Charsets.UTF_8) }
+                    input.use { stream ->
+                        val buffer = java.io.ByteArrayOutputStream()
+                        val chunk = ByteArray(64 * 1024)
+                        while (true) {
+                            val read = stream.read(chunk)
+                            if (read <= 0) break
+                            buffer.write(chunk, 0, read)
+                            require(buffer.size() <= MAX_ANALYSIS_FILE_BYTES) {
+                                context.getString(R.string.conversation_analysis_file_too_large)
+                            }
+                        }
+                        buffer.toByteArray().toString(Charsets.UTF_8)
+                    }
                 }
                 onImportAnalysis(raw)
                 Toast.makeText(
@@ -626,3 +645,6 @@ private fun RecipeBackupRow(
 
 private fun backupMessage(context: Context, base: String, modelCountRes: Int, modelCount: Int): String =
     if (modelCount > 0) base + "\n" + context.getString(modelCountRes, modelCount) else base
+
+/** 分析 JSON 的硬上限：读进内存的是 UTF-16 字符串，实际占用约两倍于此。 */
+private const val MAX_ANALYSIS_FILE_BYTES = 24 * 1024 * 1024L

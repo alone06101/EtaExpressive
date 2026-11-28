@@ -6,6 +6,9 @@ import io.github.mangi.eta.BuildConfig
 import io.github.mangi.eta.agent.media.AgentToolMediaPreviews
 import io.github.mangi.eta.agent.model.AgentContextBudget
 import io.github.mangi.eta.agent.model.AgentConversationCodec
+import io.github.mangi.eta.agent.media.AgentChatImageCache
+import io.github.mangi.eta.agent.media.MAX_AGENT_IMAGE_BYTES
+import io.github.mangi.eta.agent.media.MAX_AGENT_VIDEO_BYTES
 import io.github.mangi.eta.agent.model.AgentModelClient
 import io.github.mangi.eta.agent.model.AgentSensitiveToolPolicy
 import io.github.mangi.eta.agent.model.AgentTraceFormatter
@@ -234,6 +237,7 @@ internal object EtaConversationAnalysisRepository {
     suspend fun import(
         context: Context,
         document: EtaConversationAnalysisDocument,
+        titleSuffix: String = "",
     ): String = withContext(Dispatchers.IO) {
         val appContext = context.applicationContext
         val id = "conv-${UUID.randomUUID()}"
@@ -249,34 +253,60 @@ internal object EtaConversationAnalysisRepository {
         val appliedRunIds = document.conversation.appliedRuntimeRunIds.orEmpty()
         val runIdRemap = appliedRunIds.associateWith { "run-${UUID.randomUUID()}" }
         val remappedRunIds = appliedRunIds.map { runIdRemap.getValue(it) }
+        val database = EtaDatabase.get(appContext)
+        val dao = database.conversationDao()
+        // 「能还原就还原」：这些 id 只有在目标设备上真的存在、且模型仍然可用时才沿用，
+        // 跨设备导入时自然回落为空（与原来一律留空的行为一致）。
+        val keepProviderId = document.conversation.providerId.takeIf { providerId ->
+            providerId.isNotBlank() && runCatching {
+                ProviderRepository.providerById(providerId)?.takeIf { provider ->
+                    provider.isEnabled && provider.models.any {
+                        it.id == document.conversation.modelId && it.isEnabled
+                    }
+                }
+            }.getOrNull() != null
+        }
+        val keepFolderId = document.conversation.folderId.takeIf { folderId ->
+            folderId.isNotBlank() && runCatching { dao.folders().any { it.id == folderId } }.getOrDefault(false)
+        }
         val conversation = ConversationEntity(
             id = id,
-            title = document.conversation.title,
+            title = document.conversation.title + titleSuffix,
             thinkingEnabled = document.conversation.thinkingEnabled,
             reasoningEffort = reasoningEffort,
             historyJson = "[]",
             appliedRuntimeRunIdsJson = encodeStringList(remappedRunIds),
             createdAt = now,
             updatedAt = now,
-            folderId = "",
+            folderId = keepFolderId.orEmpty(),
             isPinned = false,
             hasCompletionMarker = false,
-            // 提供商与模型是本机的东西，导入方未必有；留空让会话回落到本机默认模型。
-            providerId = "",
-            modelId = "",
+            // 提供商与模型只有在本机存在时才沿用；否则留空回落到本机默认模型。
+            providerId = keepProviderId.orEmpty(),
+            modelId = if (keepProviderId != null) document.conversation.modelId else "",
             assistantId = "",
         )
-        val database = EtaDatabase.get(appContext)
-        val dao = database.conversationDao()
+        require(document.messages.size <= MAX_IMPORTED_MESSAGES) {
+            "分析文件消息过多（${document.messages.size} 条，上限 $MAX_IMPORTED_MESSAGES）"
+        }
+        document.messages.firstOrNull { it.content.length > MAX_IMPORTED_MESSAGE_CHARS }?.let {
+            error("分析文件里有超长消息（超过 $MAX_IMPORTED_MESSAGE_CHARS 字符），已拒绝导入")
+        }
         val messages = document.messages
             .filter { it.type in IMPORTABLE_MESSAGE_TYPES }
-            .mapIndexed { index, message -> message.toEntity(id, index, runIdRemap) }
+            .mapIndexed { index, message -> message.toEntity(appContext, id, index, runIdRemap) }
+        // 超大会话的 checkpoint 可能即使去掉 turn 保护后仍然超限：此时丢的是「模型侧历史」，
+        // 消息本体照样导入，比整次导入失败更合理。
         val checkpoint = document.history.takeIf { it.isNotEmpty() }?.let { history ->
-            ConversationContextCheckpointEntity(
-                conversationId = id,
-                historyJson = encodeCheckpoint(history),
-                cloudUsageJson = "",
-            )
+            runCatching {
+                ConversationContextCheckpointEntity(
+                    conversationId = id,
+                    historyJson = encodeCheckpoint(history),
+                    cloudUsageJson = "",
+                )
+            }.onFailure {
+                AndroidAgentLogger.warn("analysis import: checkpoint dropped (${it.javaClass.simpleName})")
+            }.getOrNull()
         }
         database.withTransaction {
             dao.importAsNewConversation(conversation, messages, checkpoint)
@@ -407,6 +437,7 @@ internal object EtaConversationAnalysisRepository {
     }
 
     private fun EtaConversationAnalysisMessage.toEntity(
+        context: Context,
         conversationId: String,
         sortIndex: Int,
         runIdRemap: Map<String, String>,
@@ -432,7 +463,9 @@ internal object EtaConversationAnalysisRepository {
             sortIndex = sortIndex,
             type = type,
             content = content,
-            imagesJson = encodeImages(images),
+            imagesJson = encodeImages(
+                images.mapIndexed { index, image -> stageImportedImage(context, conversationId, image, sortIndex, index) },
+            ),
             isEdited = isEdited,
             renderMarkdown = renderMarkdown,
             contextTokens = contextTokens,
@@ -453,6 +486,43 @@ internal object EtaConversationAnalysisRepository {
             generatedAtMillis = generatedAtMillis,
             usageDiagnosticsJson = UsageDiagnosticsJson.encode(diagnostics),
         )
+    }
+
+    /**
+     * 把分析文件里内联的图片写进附件目录，并换成文件引用。
+     *
+     * 只靠 dataUrl 内联有两个问题：库里存着几百 KB 的 base64，而且历史水合是按
+     * 文件路径找图的——文件不存在时那张图对模型就等于没送过。写入后这两个问题一起消失。
+     *
+     * 已经是文件路径的直接跳过（同机导出且未包含图片时就是这个形态）；
+     * 写入失败（超出上限、目录不可用）就保留原样，不让一张图毁掉整个导入。
+     */
+    private fun stageImportedImage(
+        context: Context,
+        conversationId: String,
+        image: EtaConversationAnalysisImage,
+        sortIndex: Int,
+        indexInMessage: Int,
+    ): EtaConversationAnalysisImage {
+        val primary = image.source?.takeIf { it.isNotBlank() } ?: image.preview
+        if (!primary.startsWith("data:")) return image
+        val bytes = AgentChatImageCache.readBytes(primary)
+            ?: image.preview.takeIf { it != primary }?.let(AgentChatImageCache::readBytes)
+            ?: return image
+        val extension = when {
+            image.isVideo -> "mp4"
+            image.mime?.contains("webp", ignoreCase = true) == true -> "webp"
+            image.mime?.contains("png", ignoreCase = true) == true -> "png"
+            image.mime?.contains("gif", ignoreCase = true) == true -> "gif"
+            else -> "jpg"
+        }
+        val reference = AgentChatImageCache(context).stage(
+            conversationId = conversationId,
+            bytes = bytes,
+            displayName = "import-" + sortIndex + "-" + indexInMessage + "." + extension,
+            maxBytes = if (image.isVideo) MAX_AGENT_VIDEO_BYTES else MAX_AGENT_IMAGE_BYTES,
+        ) ?: return image
+        return image.copy(preview = reference.absolutePath, source = reference.absolutePath)
     }
 
     private fun encodeImages(images: List<EtaConversationAnalysisImage>): String {
@@ -500,7 +570,10 @@ internal object EtaConversationAnalysisRepository {
             val page = dao.archivedEvents(archiveRunId, ARCHIVE_EVENT_PAGE_SIZE, offset)
             if (page.isEmpty()) break
             page.forEach { row ->
-                runCatching { json.parseToJsonElement(row.eventJson) }.getOrNull()?.let(elements::add)
+                // 事件里同样可能有终端回显的凭据：与 transcript 走同一套脱敏，
+                // 否则勾上「原始模型 I/O」就会把这些原样写进导出文件。
+                val redacted = traceFormatter.redactCredentials(row.eventJson)
+                runCatching { json.parseToJsonElement(redacted) }.getOrNull()?.let(elements::add)
             }
             offset += page.size
             if (page.size < ARCHIVE_EVENT_PAGE_SIZE) break
@@ -532,4 +605,10 @@ internal object EtaConversationAnalysisRepository {
         }
 
     private const val ARCHIVE_EVENT_PAGE_SIZE = 64
+
+    /** 单次导入允许的最大消息条数：超出通常意味着文件被构造过，而不是真实会话。 */
+    private const val MAX_IMPORTED_MESSAGES = 20_000
+
+    /** 单条消息正文上限；超过它会让单行写入异常巨大，也拖垮后续渲染。 */
+    private const val MAX_IMPORTED_MESSAGE_CHARS = 4_000_000
 }
