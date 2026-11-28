@@ -1080,7 +1080,10 @@ fun AgentAppRoot(
             onConversationAnalysisImportInto = { conversation ->
                 analysisImportIntoConversationId = conversation.id
                 runCatching {
-                    analysisImportIntoLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+                    analysisImportIntoLauncher.launch(
+                        // 不要写成通配符字面量：源码里出现注释起止符会破坏契约测试的注释剥离。
+                        arrayOf("application/json", "text/plain", "*" + "/" + "*"),
+                    )
                 }.onFailure { analysisImportIntoConversationId = null }
             },
             onOpenManageChats = { pushFromDrawer(AppRoute.ManageChats) },

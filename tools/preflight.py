@@ -116,6 +116,35 @@ def check_imports(path):
             problems.append(path + ' 使用了 ' + symbol + ' 但缺少 import：' + expected)
 
 
+def check_comment_delimiters_in_strings(path):
+    """
+    源码字符串里出现注释起止符会破坏 app/src/test/python 那套契约测试。
+
+    它们先用正则把注释剥掉再抽取结构（例如 entry<AppRoute.X>）；一旦某行字符串里
+    写了通配符 mime（星号斜杠星号），剥注释阶段会把后面整段代码当成块注释吞掉，
+    断言就以「未抽到任何 entry」这种莫名其妙的形式失败。
+    """
+    # 只有被契约测试做「注释剥离」的那几个文件才受这条约束；其它文件里的
+    # "*/*"、"image/*" 之类字符串不会进入那套正则，报出来只会是噪音。
+    if not path.endswith(('AgentAppRoot.kt', 'AppRoute.kt', 'AgentNavigator.kt')):
+        return
+    open_marker = '/' + '*'
+    close_marker = '*' + '/'
+    literal_pattern = re.compile(r'"((?:[^"\\]|\\.)*)"')
+    lines = read(path).split(chr(10))
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        # 注释行本身必然含起止符，跳过；只看真正的字符串字面量内部。
+        if stripped.startswith('//') or stripped.startswith('*') or stripped.startswith(open_marker):
+            continue
+        for literal in literal_pattern.findall(line):
+            if open_marker in literal or close_marker in literal:
+                problems.append(
+                    path + ':' + str(index + 1) + ' 字符串里出现注释起止符，会破坏契约测试的注释剥离：'
+                    + stripped[:60])
+                break
+
+
 def check_strings_locales():
     paths = {
         'en': 'app/src/main/res/values/strings.xml',
@@ -150,6 +179,7 @@ def main():
         check_query_parameters(path)
     for path in sorted(glob.glob('app/src/main/kotlin/**/*.kt', recursive=True)):
         check_imports(path)
+        check_comment_delimiters_in_strings(path)
     check_strings_locales()
 
     for item in warnings:
